@@ -27,10 +27,11 @@ individual::individual(unsigned int dimension, double radius, double limit)
 	uniform_int_distribution<mt19937::result_type> dist(0, limit);
 	uniform_int_distribution<mt19937::result_type> sign(0, 1);
 
+	double fixed_velocity = ((double)limit / 10000.0);
 	for(unsigned int i = 0; i < dimension; ++i) {
 		double val = dist(rng);
 		this->pos[i] = this->pos_next[i] = sign(rng) ? val : -val;
-		this->velocity[i] = sign(rng) ? 0.1 : -0.1;
+		this->velocity[i] = sign(rng) ? fixed_velocity : -fixed_velocity;
 	}
 }
 
@@ -134,6 +135,7 @@ void population::adjustment()
 
 	/* retries 2 times because we only have 2 directions to go at the moment */
 	while(collision() && retries < 2){
+		/* TODO: GPU version */
 		for(unsigned int i = 0; i < this->pop_size; ++i){
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
@@ -152,6 +154,7 @@ void population::adjustment()
 
 	/* collision still exists, stop the entities detected collision */
 	while(collision()){
+		/* TODO: GPU version */
 		for(unsigned int i = 0; i < this->pop_size; ++i){
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
@@ -178,13 +181,24 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		this->bm.push_back(one_bit());
 	}
 
-	/* make sure the population is initialized with no collision */
-	while(collision()){
+	unsigned int retries = 0;
+	/* make sure the population is initialized with no collision, give a retry limitation to prevent forever loop */
+	while(collision() && retries++ < 99){
+		/* TODO: GPU version */
 		for(unsigned int i = 0; i < size; ++i){
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
 				this->entities[i] = individual(dimension, radius, limit);
 			}
 		}
+	}
+
+	if(retries == 100){
+		std:: cout << "No room for that much(big) entities! "
+			   << "Please revise your arguments by "
+			   << "decresing the [population size], [radius of entity] "
+			   << "or incresing the [playground dimension]" 
+			   << endl;
+		exit(1);
 	}
 }

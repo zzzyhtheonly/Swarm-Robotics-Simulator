@@ -28,6 +28,7 @@ void render_function()
 	unsigned long timestamp = 1;	
 	population test = population(population_size, dimension_size, radius, ground_dimension);
 	while(timestamp++){
+		/* TODO: GPU version */
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].draw();
 			test.entities[i].move_prediction();
@@ -35,6 +36,7 @@ void render_function()
 
 		test.adjustment();
 		
+		/* TODO: GPU version */
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].move();
 		}
