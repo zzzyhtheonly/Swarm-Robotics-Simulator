@@ -9,7 +9,7 @@ DEPS := $(OBJS:.o=.d)
 INC_DIRS := $(shell find $(SRC_DIRS) -type d)
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -Wall -g
+CPPFLAGS ?= $(INC_FLAGS) -std=c++11 -MMD -MP -Wall -g
 OPENGLFLAGS := -lglut -lGL -lGLEW -lGLU
 
 $(TARGET): $(OBJS)
