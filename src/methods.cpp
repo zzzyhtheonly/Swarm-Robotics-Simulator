@@ -14,10 +14,9 @@ drawable::drawable(unsigned int dimension, double radius, double limit)
 	this->radius = radius;
 
 	/* initialize coordinates randomly */
-	/* TODO: make it into float */
 	random_device dev;
 	mt19937 rng(dev());
-	uniform_int_distribution<mt19937::result_type> dist(0, limit);
+	uniform_real_distribution<double> dist(0, limit);
 	uniform_int_distribution<mt19937::result_type> sign(0, 1);
 
 	for(unsigned int i = 0; i < dimension; ++i) {
@@ -61,10 +60,9 @@ individual::individual(unsigned int dimension, double radius, double limit) : dr
 	this->status = READY;
 
 	/* initialize coordinates and velocities randomly */
-	/* TODO: make it into float */
 	random_device dev;
 	mt19937 rng(dev());
-	uniform_int_distribution<mt19937::result_type> dist(0, limit);
+	uniform_real_distribution<double> dist(0, limit);
 	uniform_int_distribution<mt19937::result_type> sign(0, 1);
 
 	double fixed_velocity = ((double)limit / 10000.0);
