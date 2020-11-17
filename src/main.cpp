@@ -1,10 +1,12 @@
 #include <GL/freeglut.h>
 #include <GL/gl.h>
 #include <iostream>
+#include <unistd.h>
 
 #include "headers.h"
 
 /* arguments */
+unsigned int mode = 0;
 unsigned int population_size = 10;
 double radius = 20;
 double ground_dimension = 1000;
@@ -70,8 +72,9 @@ void render_function()
 int main(int argc, char* argv[])
 {
 	/* parse arguments */
+	int opt;
 	if(argc == 1){
-		std::cout << "Usage: ./simulator [population size] "
+		std::cout << "Usage: ./simulator -mode [population size] "
 			  << "[radius of individual: default is set to 20] "
 			  << "[dimension of the playground: default is set to 1000]" 
 			  << "[number of objectives: default is 2] "
@@ -81,22 +84,42 @@ int main(int argc, char* argv[])
 		std::cout << "         ./simulator 50 50 2000 " << std::endl;
 		std::cout << "         ./simulator 100 20 1000 2 100" << std::endl;
 		std::cout << "Note: exit the program by entering Ctrl^C from the terminal" << std::endl;
+		std::cout << "Mode: -r randomly initialized without targets" << std::endl;
+		std::cout << "      -t robots start from the leftmost edge moving to the rightmost edge" << std::endl;
 		return 0;
 	}
-	if(argc >= 2){
-		population_size = atoi(argv[1]);
+
+	while((opt = getopt(argc, argv, "rt")) != -1)
+	{
+		switch(opt)
+		{
+			case 'r':
+				mode = 0;
+				break;
+			case 't':
+				mode = 1;
+				break;
+			case '?':
+				std::cout << "Unknown option: " << optopt << std::endl;
+				return 0;
+				break;
+		}
 	}
-	if(argc >= 3){
-		radius = atof(argv[2]);
+
+	if(optind < argc){
+		population_size = atoi(argv[optind++]);
 	}
-	if(argc >= 4){
-		ground_dimension = atof(argv[3]);
+	if(optind < argc){
+		radius = atof(argv[optind++]);
 	}
-	if (argc >= 5){
-		number_objectives = atoi(argv[4]);
+	if(optind < argc){
+		ground_dimension = atof(argv[optind++]);
 	}
-	if (argc >= 6){
-		objective_radius = atof(argv[5]);
+	if (optind < argc){
+		number_objectives = atoi(argv[optind++]);
+	}
+	if (optind < argc){
+		objective_radius = atof(argv[optind++]);
 	}
 
 	/* init window */
