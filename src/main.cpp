@@ -74,9 +74,12 @@ int main(int argc, char* argv[])
 		std::cout << "Usage: ./simulator [population size] "
 			  << "[radius of individual: default is set to 20] "
 			  << "[dimension of the playground: default is set to 1000]" 
+			  << "[number of objectives: default is 2] "
+			  << "[radius of objectives: default is 100] "
 			  << std::endl;
 		std::cout << "Example: ./simulator 10" << std::endl;
 		std::cout << "         ./simulator 50 50 2000 " << std::endl;
+		std::cout << "         ./simulator 100 20 1000 2 100" << std::endl;
 		std::cout << "Note: exit the program by entering Ctrl^C from the terminal" << std::endl;
 		return 0;
 	}
