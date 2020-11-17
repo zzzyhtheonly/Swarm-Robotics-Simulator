@@ -1,5 +1,8 @@
 #include <vector>
 
+#define RANDOM_INIT 0
+#define LEFTMOST_INIT 1
+
 using namespace::std;
 
 /* define a one bit data structure for bitmap */
@@ -13,6 +16,7 @@ typedef struct one_bit
 /* states describe a robot's status */
 enum states
 {
+	TERMINATE,
 	STOP,
 	READY,
 	RUNNING,
@@ -58,6 +62,9 @@ class individual : public drawable
 public:
 	/* current status */
 	states status;
+
+	/* simulator mode */
+	unsigned int mode;
 	
 	/* next position of each entity with respect to the current velocity, it is used to adjust velocity in order to avoid collision */
 	vector<double> pos_next;
@@ -67,10 +74,10 @@ public:
 
 	/* construct functions */
 	individual() = delete;
-	individual(unsigned int dimension, double radius, double limit);
+	individual(unsigned int dimension, double radius, double limit, unsigned int mode);
 
-	/* no checks move */
-	void _move(vector<double>&);
+	/* no checks move, return true if there is collisions with walls */
+	bool _move(vector<double>&);
 
 	/* movement with respect to velocity, affects pos */
 	void move();
@@ -110,7 +117,7 @@ public:
 
 	/* construct functions */
 	population() = delete;
-	population(unsigned int size, unsigned int dimension, double radius, double limit, unsigned int num_objectives, double objective_radius);
+	population(unsigned int size, unsigned int dimension, double radius, double limit, unsigned int num_objectives, double objective_radius, unsigned int mode);
 
 	/* AI Perception function, each entity takes in input from the environment */
 	void sense();
@@ -123,6 +130,9 @@ public:
 
 	/* adjust velocity of each entity with respect to collision detection */
 	void adjustment();
+
+	/* check if all entities terminate */
+	bool terminate();
 	
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}

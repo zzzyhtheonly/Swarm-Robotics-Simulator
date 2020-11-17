@@ -29,7 +29,7 @@ void render_function()
 	
 	/* draw something */
 	unsigned long timestamp = 1;	
-	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius);
+	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 
 	while(timestamp++){
 		/* Draw objectives, no AI here */
@@ -60,6 +60,11 @@ void render_function()
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].move();
+		}
+
+		/* for leftmost mode, check if all entities reach the rightmost */
+		if(mode == LEFTMOST_INIT && test.terminate()){
+			sleep(5);
 		}
 
 		glFlush();
@@ -94,10 +99,10 @@ int main(int argc, char* argv[])
 		switch(opt)
 		{
 			case 'r':
-				mode = 0;
+				mode = RANDOM_INIT;
 				break;
 			case 't':
-				mode = 1;
+				mode = LEFTMOST_INIT;
 				break;
 			case '?':
 				std::cout << "Unknown option: " << optopt << std::endl;

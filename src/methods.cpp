@@ -49,7 +49,7 @@ objective::objective(unsigned int dimension, double radius, double limit) : draw
  * radius: fix to 20 at the moment
  * limit: playground dimension limit, only square allowed, assume that you want a 1000*1000 square then limit should be 1000
  */
-individual::individual(unsigned int dimension, double radius, double limit) : drawable(dimension, radius, limit)
+individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode) : drawable(dimension, radius, limit)
 {
 	this->dimension = dimension;
 	this->limit = limit;
@@ -58,6 +58,7 @@ individual::individual(unsigned int dimension, double radius, double limit) : dr
 	this->velocity = vector<double>(dimension, 0);
 	this->radius = radius;
 	this->status = READY;
+	this->mode = mode;
 
 	/* initialize coordinates and velocities randomly */
 	random_device dev;
@@ -66,6 +67,18 @@ individual::individual(unsigned int dimension, double radius, double limit) : dr
 	uniform_int_distribution<mt19937::result_type> sign(0, 1);
 
 	double fixed_velocity = ((double)limit / 10000.0);
+
+	/* only works when dimension is 2 */
+	if(mode == LEFTMOST_INIT) {
+		double val = dist(rng);
+		this->pos[1] = this->pos_next[1] = sign(rng) ? val : -val;
+		this->velocity[0] = fixed_velocity;
+		this->pos[0] = this->pos_next[0] = -limit;
+		this->velocity[1] = 0;
+
+		return;
+	}
+
 	for(unsigned int i = 0; i < dimension; ++i) {
 		double val = dist(rng);
 		this->pos[i] = this->pos_next[i] = sign(rng) ? val : -val;
@@ -73,17 +86,23 @@ individual::individual(unsigned int dimension, double radius, double limit) : dr
 	}
 }
 
-/* pure move */
-void individual::_move(vector<double>& pos)
+/* pure move 
+ * return value: true means entity collides on walls
+ */
+bool individual::_move(vector<double>& pos)
 {
+	bool res = false;
 	for(unsigned int i = 0; i < this->dimension; ++i){
 		/* detect collision with walls */
 		double tmp = pos[i] + this->velocity[i];	
 		if(tmp > limit || tmp < -limit){
-			velocity[i] = -velocity[i];
+				velocity[i] = -velocity[i];
+				res = true;
 		}
 		pos[i] += velocity[i];
 	}
+
+	return res;
 }
 
 /* movement with respect to veclocity */
@@ -99,7 +118,7 @@ void individual::move()
 	}
 
 	_move(this->pos);
-
+	
 	/* update pos_next after real movement */
 	for(unsigned int i = 0; i < this->dimension; ++i){
 		this->pos_next[i] = this->pos[i];
@@ -110,7 +129,13 @@ void individual::move()
 /* predict movement with respect to velocity */
 void individual::move_prediction()
 {
-	_move(this->pos_next);
+	bool terminate = _move(this->pos_next);
+	
+	/* on leftmost mode, if entity reaches targets, terminate permanently */
+	if(mode == LEFTMOST_INIT && terminate){
+		this->status = TERMINATE;
+		this->velocity = vector<double>(this->dimension, 0);
+	}
 }
 
 /*
@@ -229,18 +254,33 @@ void population::adjustment()
 	}
 }
 
+/* check if all entities terminate */
+bool population::terminate()
+{
+	bool res = true;
+
+	for(auto e : entities){
+		if(e.status != TERMINATE){
+			res = false;
+			break;
+		}
+	}
+
+	return res;
+}
+
 /*
  * size: fix to 10 at the moment
  * others: same to the arguments of individual(...)
  */
-population::population(unsigned int size, unsigned int dimension, double radius, double limit, unsigned int num_objectives, double objective_radius)
+population::population(unsigned int size, unsigned int dimension, double radius, double limit, unsigned int num_objectives, double objective_radius, unsigned int mode)
 {
 	this->pop_size = size;
 	this->num_objs = num_objectives;
 	this->dim = dimension;
 
 	for(unsigned int i = 0; i < size; ++i){
-		this->entities.push_back(individual(dimension, radius, limit));
+		this->entities.push_back(individual(dimension, radius, limit, mode));
 		this->bm.push_back(one_bit());
 	}
 
@@ -255,7 +295,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		for(unsigned int i = 0; i < size; ++i){
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
-				this->entities[i] = individual(dimension, radius, limit);
+				this->entities[i] = individual(dimension, radius, limit, mode);
 			}
 		}
 	}
