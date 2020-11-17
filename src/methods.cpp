@@ -5,12 +5,52 @@
 
 #include "headers.h"
 
+/** Parent class for things that need to be displayed on screen **/
+drawable::drawable(unsigned int dimension, double radius, double limit)
+{
+	this->dimension = dimension;
+	this->limit = limit;
+	this->pos = vector<double>(dimension, 0);
+	this->radius = radius;
+
+	/* initialize coordinates randomly */
+	/* TODO: make it into float */
+	random_device dev;
+	mt19937 rng(dev());
+	uniform_int_distribution<mt19937::result_type> dist(0, limit);
+	uniform_int_distribution<mt19937::result_type> sign(0, 1);
+
+	for(unsigned int i = 0; i < dimension; ++i) {
+		double val = dist(rng);
+		this->pos[i] = sign(rng) ? val : -val;
+	}
+}
+
+/* draw itself in OpenGL by filling with tiny triangles */
+void drawable::draw()
+{
+	unsigned int count = 20;
+	GLfloat twicePi = 2.0f * M_PI;
+
+	glBegin(GL_TRIANGLE_FAN);
+
+		/* center */
+		glVertex2f(pos[0], pos[1]);
+
+		for(unsigned int i = 0; i <= count; ++i) {
+			glVertex2f(pos[0] + (radius * cos(i * twicePi / count)), pos[1] + (radius * sin(i * twicePi / count)));
+		}
+	glEnd();
+}
+
+objective::objective(unsigned int dimension, double radius, double limit) : drawable(dimension, radius, limit) {};
+
 /* 
  * dimension: fix to 2 at the moment
  * radius: fix to 20 at the moment
  * limit: playground dimension limit, only square allowed, assume that you want a 1000*1000 square then limit should be 1000
  */
-individual::individual(unsigned int dimension, double radius, double limit)
+individual::individual(unsigned int dimension, double radius, double limit) : drawable(dimension, radius, limit)
 {
 	this->dimension = dimension;
 	this->limit = limit;
@@ -75,22 +115,6 @@ void individual::move_prediction()
 	_move(this->pos_next);
 }
 
-/* draw itself in OpenGL by filling with tiny triangles */
-void individual::draw()
-{
-	unsigned int count = 20;
-	GLfloat twicePi = 2.0f * M_PI;
-
-	glBegin(GL_TRIANGLE_FAN);
-		/* center */
-		glVertex2f(pos[0], pos[1]);
-
-		for(unsigned int i = 0; i <= count; ++i) {
-			glVertex2f(pos[0] + (radius * cos(i * twicePi / count)), pos[1] + (radius * sin(i * twicePi / count)));
-		}
-	glEnd();
-}
-
 /*
  * test base on pos_next because we make sure that there is no collision at initial
  * another: a specific entity to test collision
@@ -107,6 +131,45 @@ bool individual::if_collision(individual another)
 	distance = sqrt(distance);
 
 	return distance < this->radius + another.radius ? true : false;
+}
+
+bool individual::if_collision(drawable another)
+{
+	double distance = 0;
+
+	for(unsigned int i = 0; i < this->dimension; ++i){
+		double tmp = this->pos_next[i] - another.pos[i];
+		distance += (tmp * tmp);
+	}
+
+	distance = sqrt(distance);
+
+	return distance < this->radius + another.radius ? true : false;
+}
+
+void population::sense()
+{
+	/* Is an entity on top of an objective? If so, stop.
+	   TODO: Expand this later to perform more complex behavior */
+	for (unsigned int i = 0; i < this->pop_size; ++i){
+		for (unsigned int j = 0; j < this->num_objs; ++j) {
+			if (this->entities[i].if_collision(this->objectives[j])){
+				this->entities[i].status = ON_OBJ;
+			}
+		}
+	}
+}
+
+void population::decide()
+{
+	/* If over an objective, stop.
+	   TODO: Expand this later to perform more complex behavior */
+	for (unsigned int i = 0; i < this->pop_size; ++i){
+		if (this->entities[i].status == ON_OBJ) {
+			this->entities[i].status = STOP;
+			this->entities[i].velocity = vector<double>(this->dim, 0);
+		}
+	}	
 }
 
 /* test if collision exists otherwise update collision bitmap */
@@ -172,13 +235,19 @@ void population::adjustment()
  * size: fix to 10 at the moment
  * others: same to the arguments of individual(...)
  */
-population::population(unsigned int size, unsigned int dimension, double radius, double limit)
+population::population(unsigned int size, unsigned int dimension, double radius, double limit, unsigned int num_objectives, double objective_radius)
 {
 	this->pop_size = size;
+	this->num_objs = num_objectives;
+	this->dim = dimension;
 
 	for(unsigned int i = 0; i < size; ++i){
 		this->entities.push_back(individual(dimension, radius, limit));
 		this->bm.push_back(one_bit());
+	}
+
+	for(unsigned int i = 0; i < num_objectives; ++i) {
+		this->objectives.push_back(objective(dimension, objective_radius, limit));
 	}
 
 	unsigned int retries = 0;

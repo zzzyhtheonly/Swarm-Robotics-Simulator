@@ -8,6 +8,8 @@
 unsigned int population_size = 10;
 double radius = 20;
 double ground_dimension = 1000;
+unsigned int number_objectives = 2;
+double objective_radius = 100;
 
 /* those are fixed at the moment */
 unsigned int dimension_size = 2;
@@ -21,13 +23,30 @@ void clear_screen()
 void render_function()
 {
 	clear_screen();
-	glColor3f(0.0, 0.0, 1.0);
 	glOrtho(-ground_dimension, ground_dimension, -ground_dimension, ground_dimension, -ground_dimension, ground_dimension);
 	
 	/* draw something */
 	unsigned long timestamp = 1;	
-	population test = population(population_size, dimension_size, radius, ground_dimension);
+	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius);
+
 	while(timestamp++){
+		/* Draw objectives, no AI here */
+		glColor3f(1.0, 0.0, 0.0);
+		for(unsigned int i = 0; i < test.num_objs; ++i){
+			test.objectives[i].draw();
+		}
+
+		/* AI Loop: Perception -> Decision -> Action */
+		/* Preception */
+
+		test.sense();		
+
+		/* Decision */
+
+		test.decide();
+
+		/* Action */
+		glColor3f(0.0, 0.0, 1.0);
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].draw();
@@ -40,7 +59,6 @@ void render_function()
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].move();
 		}
-
 
 		glFlush();
 		clear_screen();
@@ -70,6 +88,12 @@ int main(int argc, char* argv[])
 	}
 	if(argc >= 4){
 		ground_dimension = atof(argv[3]);
+	}
+	if (argc >= 5){
+		number_objectives = atoi(argv[4]);
+	}
+	if (argc >= 6){
+		objective_radius = atof(argv[5]);
 	}
 
 	/* init window */
