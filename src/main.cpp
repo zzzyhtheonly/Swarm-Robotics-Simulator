@@ -34,12 +34,6 @@ void render_function()
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 
 	while(timestamp++){
-		/* Draw objectives, no AI here */
-		glColor3f(1.0, 0.0, 0.0);
-		for(unsigned int i = 0; i < test.num_objs; ++i){
-			test.objectives[i].draw();
-		}
-
 		/* AI Loop: Perception -> Decision -> Action */
 		/* Preception */
 
@@ -50,9 +44,13 @@ void render_function()
 		test.decide(sense_dist);
 
 		/* Action */
-		glColor3f(0.0, 0.0, 1.0);
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < test.pop_size; ++i){
+			if (test.entities[i].status == LINK) {
+				glColor3f(0.0, 1.0, 0.0);
+			} else {
+				glColor3f(0.0, 0.0, 1.0);
+			}
 			test.entities[i].draw();
 			test.entities[i].move_prediction();
 		}
@@ -68,6 +66,26 @@ void render_function()
 		if(mode == LEFTMOST_INIT && test.terminate()){
 			sleep(5);
 		}
+
+		/* Draw objectives, no AI here */
+		glColor3f(1.0, 0.0, 0.0);
+		for(unsigned int i = 0; i < test.num_objs; ++i){
+			test.objectives[i]->draw();
+		}
+
+		/* Draw lines to better visualize what nodes are doing */
+		glColor3f(0.0, 0.5, 0.0);
+		for(unsigned int i = 0; i < test.pop_size; ++i){
+			if (test.entities[i].status == LINK) {
+				glBegin(GL_LINES);
+					//vector<double> A_pos = test.entities[i].pos;
+					vector<double> B_pos = test.entities[i].link->previous->node->pos;
+					glVertex2f(test.entities[i].pos[0], test.entities[i].pos[1]);
+					glVertex2f(B_pos[0], B_pos[1]);
+				glEnd();
+			}
+		}	
+
 
 		glFlush();
 		clear_screen();
@@ -92,7 +110,6 @@ int main(int argc, char* argv[])
 		std::cout << "Example: ./simulator 10" << std::endl;
 		std::cout << "         ./simulator 50 50 2000 " << std::endl;
 		std::cout << "         ./simulator 100 20 1000 2 100" << std::endl;
-		std::cout << "         ./simulator 40 20 500 1 100 5 100" << std::endl;
 		std::cout << "Note: exit the program by entering Ctrl^C from the terminal" << std::endl;
 		std::cout << "Mode: -r randomly initialized without targets" << std::endl;
 		std::cout << "      -t robots start from the leftmost edge moving to the rightmost edge" << std::endl;
@@ -130,12 +147,6 @@ int main(int argc, char* argv[])
 	}
 	if (optind < argc){
 		objective_radius = atof(argv[optind++]);
-	}
-	if (argc >= 7) {
-		branch_len = atoi(argv[6]);
-	}
-	if (argc >= 8) {
-		sense_dist = atof(argv[7]);
 	}
 
 	/* init window */

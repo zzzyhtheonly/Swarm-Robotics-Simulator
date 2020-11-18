@@ -13,20 +13,15 @@ linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
 		this->branch = true;
 		this->branch_dist = 0;
 	} else {
-		/* Was the previous node an objective? */
-		if ((drawable *)root == previous->node)
-			branch_dist = 1;
-		/* Otherwise it has to be another entity */
-		else
-			branch_dist = previous->branch_dist+1;
+		previous->next.push_back(this);
+		this->branch_dist = previous->branch_dist+1;
 		/* This link is a branch if it meets global variable branch_len */
 		if (branch_dist >= branch_len) {
 			branch = true;
 			branch_dist = 0;
+		} else {
+			branch = false;
 		}
-		/* Unless the previous entity was a branch it is no longer able to link with another entity */ 
-		if (!previous->branch)
-			previous->free = false;
 	}
 }
 
@@ -184,18 +179,18 @@ bool individual::if_collision(individual another)
 	return distance < this->radius + another.radius ? true : false;
 }
 
-bool individual::if_collision(drawable another)
+bool individual::if_collision(objective *another)
 {
 	double distance = 0;
 
 	for(unsigned int i = 0; i < this->dimension; ++i){
-		double tmp = this->pos_next[i] - another.pos[i];
+		double tmp = this->pos_next[i] - another->pos[i];
 		distance += (tmp * tmp);
 	}
 
 	distance = sqrt(distance);
 
-	return distance < this->radius + another.radius ? true : false;
+	return distance < this->radius + another->radius ? true : false;
 }
 
 bool individual::if_sense(individual another, double sense_dist) {
@@ -249,7 +244,7 @@ void population::decide(double sense_dist)
 			unsigned int j;
 			for (j = 0; j < this->num_objs; ++j) {
 				if (this->entities[i].if_collision(this->objectives[j])) {
-					obj_tmp = &(this->objectives[j]);
+					obj_tmp = this->objectives[j];
 					break;
 				}
 			}
@@ -274,8 +269,9 @@ void population::decide(double sense_dist)
 				if (i == k) continue;
 				if (this->entities[i].if_sense(this->entities[k], sense_dist) &&
 					this->entities[k].status == LINK) {
-					if (this->entities[k].link->free || this->entities[k].link->branch) {
+					if (this->entities[k].link->next.size() < 1 || this->entities[k].link->branch) {
 						std::cout << "Entity " << i << " is going to link with entity " << k << std::endl;
+						std::cout << "Entity " << k << " has " << this->entities[k].link->next.size() << " children" << std::endl;
 						another_tmp = &(this->entities[k]);
 						break;
 					}
@@ -289,7 +285,7 @@ void population::decide(double sense_dist)
 			}
 			/* Entity is within sensing distance of a linked entity, so create another link */
 			std::cout << "Starting entity " << i << " linking process" << std::endl;
-			another_tmp->link->free = false;
+			//another_tmp->link->free = false;
 			std::cout << "Other entity link free set to false" << std::endl;
 			this->entities[i].status = LINK;
 			std::cout << "Entity " << i << " status set to LINK" << std::endl;
@@ -391,7 +387,8 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	}
 
 	for(unsigned int i = 0; i < num_objectives; ++i) {
-		this->objectives.push_back(objective(dimension, objective_radius, limit));
+		objective *tmp = new objective(dimension, objective_radius, limit);
+		this->objectives.push_back(tmp);
 	}
 
 	unsigned int retries = 0;
