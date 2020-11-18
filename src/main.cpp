@@ -78,10 +78,13 @@ int main(int argc, char* argv[])
 			  << "[dimension of the playground: default is set to 1000]" 
 			  << "[number of objectives: default is 2] "
 			  << "[radius of objectives: default is 100] "
+			  << "[minimum length before branching: default is 5] "
+			  << "[Sensing distance: default is 100 "
 			  << std::endl;
 		std::cout << "Example: ./simulator 10" << std::endl;
 		std::cout << "         ./simulator 50 50 2000 " << std::endl;
 		std::cout << "         ./simulator 100 20 1000 2 100" << std::endl;
+		std::cout << "         ./simulator 40 20 500 1 100 5 100" << std::endl;
 		std::cout << "Note: exit the program by entering Ctrl^C from the terminal" << std::endl;
 		return 0;
 	}
@@ -99,6 +102,12 @@ int main(int argc, char* argv[])
 	}
 	if (argc >= 6){
 		objective_radius = atof(argv[5]);
+	}
+	if (argc >= 7) {
+		branch_len = atoi(argv[6]);
+	}
+	if (argc >= 8) {
+		sense_dist = atof(argv[7]);
 	}
 
 	/* init window */
