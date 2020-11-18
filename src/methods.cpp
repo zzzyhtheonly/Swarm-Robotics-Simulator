@@ -203,7 +203,20 @@ bool individual::if_sense(individual another, double sense_dist) {
 
 	distance = sqrt(distance);
 
-	return distance < sense_dist + another.radius ? true : false;	
+	return distance < this->radius + sense_dist + another.radius ? true : false;	
+}
+
+bool individual::if_sense(objective *another, double sense_dist) {
+	double distance = 0;
+
+	for(unsigned int i = 0; i < this->dimension; ++i){
+		double tmp = this->pos_next[i] - another->pos[i];
+		distance += (tmp * tmp);
+	}
+
+	distance = sqrt(distance);
+
+	return distance < this->radius + sense_dist + another->radius ? true : false;	
 }
 
 void population::sense(double sense_dist)
@@ -213,8 +226,8 @@ void population::sense(double sense_dist)
 		if (this->entities[i].status == LINK) continue;
 		/* Is an entity on top of an objective? */
 		for (unsigned int j = 0; j < this->num_objs; ++j) {
-			if (this->entities[i].if_collision(this->objectives[j])) {
-				std::cout << "Entity " << i << " is on objective " << j << std::endl;
+			if (this->entities[i].if_sense(this->objectives[j], sense_dist)) {
+				//std::cout << "Entity " << i << " is on objective " << j << std::endl;
 				this->entities[i].status = ON_OBJ;
 			}
 		}
@@ -227,7 +240,7 @@ void population::sense(double sense_dist)
 			if (i == j) continue;
 			if (this->entities[i].if_sense(this->entities[j], sense_dist) && 
 				this->entities[j].status == LINK) {
-				std::cout << "Entity " << i << " sensed entity " << j << std::endl;
+				//std::cout << "Entity " << i << " sensed entity " << j << std::endl;
 				this->entities[i].status = SENSE;
 			}
 		}
@@ -240,12 +253,15 @@ void population::decide(double sense_dist)
 		/* If the entity sensed that it was on an objective */
 		if (this->entities[i].status == ON_OBJ) {
 			/* Find objective that this entity is on top of */
-			objective *obj_tmp;
+			objective *obj_tmp = NULL;
 			unsigned int j;
 			for (j = 0; j < this->num_objs; ++j) {
-				if (this->entities[i].if_collision(this->objectives[j])) {
-					obj_tmp = this->objectives[j];
-					break;
+				if (this->entities[i].if_sense(this->objectives[j], sense_dist)) {
+					if (obj_tmp == NULL) {
+						obj_tmp = this->objectives[j];
+					} else {
+						std::cout << "A one link path between objectives has not been implemented yet T_T" << std::endl;
+					}
 				}
 			}
 			/* not sure if this can happen, but return to running if so */
@@ -262,37 +278,32 @@ void population::decide(double sense_dist)
 		other linked entity */
 		} else if (this->entities[i].status == SENSE) {
 			/* Find the first linked entity that is also free or able to branch */
-			std::cout << "Entity " << i << " is deciding what to do after sensing another linked entity" << std::endl;
-			individual *another_tmp;
-			unsigned int k;
-			for (k = 0; k < this->pop_size; ++k) {
+			//std::cout << "Entity " << i << " is deciding what to do after sensing another linked entity" << std::endl;
+			individual *another_tmp = NULL;
+			unsigned int k_actual = -1;
+			for (unsigned int k = 0; k < this->pop_size; ++k) {
 				if (i == k) continue;
 				if (this->entities[i].if_sense(this->entities[k], sense_dist) &&
 					this->entities[k].status == LINK) {
+					if (another_tmp != NULL && another_tmp->link->root != this->entities[k].link->root)
+						form_path(another_tmp, &(this->entities[k]), &(this->entities[i]));
 					if (this->entities[k].link->next.size() < 1 || this->entities[k].link->branch) {
-						std::cout << "Entity " << i << " is going to link with entity " << k << std::endl;
-						std::cout << "Entity " << k << " has " << this->entities[k].link->next.size() << " children" << std::endl;
 						another_tmp = &(this->entities[k]);
-						break;
+						k_actual = k;
 					}
 				}
 			}
-			/* This can happen if two entities sense the same linked entity */
-			if (k >= this->pop_size) {
-				std::cout << "Entity " << i << " could not find another suitable entity to link with" << std::endl;
+			/* This can happen if two entities sense the same linked entity (one will link with it before the other) */
+			if (another_tmp == NULL) {
 				this->entities[i].status = RUNNING;
 				continue;
 			}
+			std::cout << "Entity " << i << " is linking with entity " << k_actual << std::endl;
 			/* Entity is within sensing distance of a linked entity, so create another link */
-			std::cout << "Starting entity " << i << " linking process" << std::endl;
 			//another_tmp->link->free = false;
-			std::cout << "Other entity link free set to false" << std::endl;
 			this->entities[i].status = LINK;
-			std::cout << "Entity " << i << " status set to LINK" << std::endl;
 			this->entities[i].velocity = vector<double>(this->dim, 0);
-			std::cout << "Entity " << i << " velocity set to 0" << std::endl;
 			this->entities[i].link = new linked_tree(another_tmp->link->root, another_tmp->link, &(this->entities[i]));
-			std::cout << "Entity " << i << " linked successfully" << std::endl;
 		}
 	}	
 }
@@ -369,6 +380,10 @@ bool population::terminate()
 	}
 
 	return res;
+}
+
+void population::form_path(individual *linked1, individual *linked2, individual *finder) {
+	std::cout << "FOUND A PATH" << std::endl;
 }
 
 /*

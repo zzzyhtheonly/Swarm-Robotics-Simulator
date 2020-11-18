@@ -34,6 +34,12 @@ void render_function()
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 
 	while(timestamp++){
+		/* Draw objectives, no AI here */
+		glColor3f(1.0, 0.0, 0.0);
+		for(unsigned int i = 0; i < test.num_objs; ++i){
+			test.objectives[i]->draw();
+		}
+
 		/* AI Loop: Perception -> Decision -> Action */
 		/* Preception */
 
@@ -47,7 +53,12 @@ void render_function()
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			if (test.entities[i].status == LINK) {
-				glColor3f(0.0, 1.0, 0.0);
+				if (test.entities[i].link->branch)
+					glColor3f(0.0, 1.0, 0.5);
+				else
+					glColor3f(0.0, 1.0, 0.0);
+			} else if (test.entities[i].status == PATH) {
+				glColor3f(1.0, 0.0, 1.0);
 			} else {
 				glColor3f(0.0, 0.0, 1.0);
 			}
@@ -65,12 +76,6 @@ void render_function()
 		/* for leftmost mode, check if all entities reach the rightmost */
 		if(mode == LEFTMOST_INIT && test.terminate()){
 			sleep(5);
-		}
-
-		/* Draw objectives, no AI here */
-		glColor3f(1.0, 0.0, 0.0);
-		for(unsigned int i = 0; i < test.num_objs; ++i){
-			test.objectives[i]->draw();
 		}
 
 		/* Draw lines to better visualize what nodes are doing */

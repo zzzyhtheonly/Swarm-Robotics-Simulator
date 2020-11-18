@@ -27,6 +27,7 @@ enum states
 	ON_OBJ,
 	LINK,
 	SENSE,
+	PATH,
 	BRANCH,
 };
 
@@ -49,8 +50,6 @@ public:
 	unsigned int branch_dist;
 	/* Indicates if the tree can branch at this link */
 	bool branch = false;
-	/* Indicates if another entity can link off this link */
-	bool free = true;
 
 	linked_tree() = delete;
 	linked_tree(objective *r, linked_tree *p, drawable *n);
@@ -127,6 +126,7 @@ public:
 
 	/* Sensing detection between this and given entity */
 	bool if_sense(individual another, double sense_dist);
+	bool if_sense(objective *another, double sense_dist);
 
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
@@ -175,6 +175,8 @@ public:
 	
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
+
+	void form_path(individual *linked1, individual *linked2, individual *finder);
 };
 
 /* TODO: class to fit genetic algorithm */
