@@ -27,6 +27,7 @@ enum states
 	ON_OBJ,
 	LINK,
 	SENSE,
+	PATH,
 	BRANCH,
 };
 
@@ -41,14 +42,14 @@ public:
 	objective *root;
 	/* Previous link which is closer in the tree to the root */
 	linked_tree *previous;
+	/* Links that come after this one */
+	vector<linked_tree *> next;
 	/* What is at this link in the linked tree */
 	drawable *node;
 	/* Distance from last branch */
 	unsigned int branch_dist;
 	/* Indicates if the tree can branch at this link */
 	bool branch = false;
-	/* Indicates if another entity can link off this link */
-	bool free = true;
 
 	linked_tree() = delete;
 	linked_tree(objective *r, linked_tree *p, drawable *n);
@@ -84,9 +85,10 @@ public:
    Can expand this later */
 class objective : public drawable {
 public:
+	unsigned int id = -1;
 	/* construct functions */
 	objective() = delete;
-	objective(unsigned int dimension, double radius, double limit);
+	objective(unsigned int dimension, double radius, double limit, unsigned int id);
 
 };
 
@@ -121,10 +123,11 @@ public:
 
 	/* collision detection between this and given entity */
 	bool if_collision(individual another);
-	bool if_collision(drawable another);
+	bool if_collision(objective *another);
 
 	/* Sensing detection between this and given entity */
 	bool if_sense(individual another, double sense_dist);
+	bool if_sense(objective *another, double sense_dist);
 
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
@@ -147,7 +150,7 @@ public:
 	unsigned int dim;
 
 	/* objectives for population, represented by drawables */
-	vector<objective> objectives;
+	vector<objective *> objectives;
 
 	/* bitmap of all entities, 1 means collison detected */
 	vector<one_bit> bm; 
@@ -173,6 +176,8 @@ public:
 	
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
+
+	void form_path(individual *linked1, individual *linked2, individual *finder);
 };
 
 /* TODO: class to fit genetic algorithm */
