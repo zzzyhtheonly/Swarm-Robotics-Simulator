@@ -66,7 +66,7 @@ void render_function()
 
 		/* for leftmost mode, check if all entities reach the rightmost */
 		if(mode == LEFTMOST_INIT && test.terminate()){
-			sleep(5);
+			break;
 		}
 
 		glFlush();
