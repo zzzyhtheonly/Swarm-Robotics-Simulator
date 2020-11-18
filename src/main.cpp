@@ -58,7 +58,7 @@ void render_function()
 				else
 					glColor3f(0.0, 1.0, 0.0);
 			} else if (test.entities[i].status == PATH) {
-				glColor3f(1.0, 0.0, 1.0);
+				glColor3f(.5, 0.0, .5);
 			} else {
 				glColor3f(0.0, 0.0, 1.0);
 			}
@@ -79,11 +79,13 @@ void render_function()
 		}
 
 		/* Draw lines to better visualize what nodes are doing */
-		glColor3f(0.0, 0.5, 0.0);
 		for(unsigned int i = 0; i < test.pop_size; ++i){
-			if (test.entities[i].status == LINK) {
+			if (test.entities[i].status == LINK || test.entities[i].status == PATH) {
+				if (test.entities[i].status == LINK)
+					glColor3f(0.0, 0.5, 0.0);
+				else
+					glColor3f(0.25, 0.0, 0.25);
 				glBegin(GL_LINES);
-					//vector<double> A_pos = test.entities[i].pos;
 					vector<double> B_pos = test.entities[i].link->previous->node->pos;
 					glVertex2f(test.entities[i].pos[0], test.entities[i].pos[1]);
 					glVertex2f(B_pos[0], B_pos[1]);

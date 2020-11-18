@@ -85,9 +85,10 @@ public:
    Can expand this later */
 class objective : public drawable {
 public:
+	unsigned int id = -1;
 	/* construct functions */
 	objective() = delete;
-	objective(unsigned int dimension, double radius, double limit);
+	objective(unsigned int dimension, double radius, double limit, unsigned int id);
 
 };
 

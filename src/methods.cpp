@@ -62,8 +62,10 @@ void drawable::draw()
 	glEnd();
 }
 
-objective::objective(unsigned int dimension, double radius, double limit) : drawable(dimension, radius, limit) {
-	/* Only thing objective needs to do is establish root of linked tree */
+objective::objective(unsigned int dimension, double radius, double limit, unsigned int id) : drawable(dimension, radius, limit) {
+	/* Set my id */
+	this->id = id;	
+	/* Establish root of linked tree */
 	this->link = new linked_tree(this, NULL, this);
 };
 
@@ -223,7 +225,7 @@ void population::sense(double sense_dist)
 {
 	
 	for (unsigned int i = 0; i < this->pop_size; ++i){
-		if (this->entities[i].status == LINK) continue;
+		if (this->entities[i].status == LINK || this->entities[i].status == PATH) continue;
 		/* Is an entity on top of an objective? */
 		for (unsigned int j = 0; j < this->num_objs; ++j) {
 			if (this->entities[i].if_sense(this->objectives[j], sense_dist)) {
@@ -254,8 +256,7 @@ void population::decide(double sense_dist)
 		if (this->entities[i].status == ON_OBJ) {
 			/* Find objective that this entity is on top of */
 			objective *obj_tmp = NULL;
-			unsigned int j;
-			for (j = 0; j < this->num_objs; ++j) {
+			for (unsigned int j = 0; j < this->num_objs; ++j) {
 				if (this->entities[i].if_sense(this->objectives[j], sense_dist)) {
 					if (obj_tmp == NULL) {
 						obj_tmp = this->objectives[j];
@@ -270,7 +271,7 @@ void population::decide(double sense_dist)
 				continue;
 			}
 			/* Otherwise this entity is now in a linked_tree */
-			std::cout << "Entity " << i << " is linking with objective " << j << std::endl;
+			std::cout << "Entity " << i << " is linking with objective " << obj_tmp->id << std::endl;
 			this->entities[i].status = LINK;
 			this->entities[i].velocity = vector<double>(this->dim, 0);
 			this->entities[i].link = new linked_tree(obj_tmp->link->root, obj_tmp->link, &(this->entities[i]));
@@ -285,13 +286,18 @@ void population::decide(double sense_dist)
 				if (i == k) continue;
 				if (this->entities[i].if_sense(this->entities[k], sense_dist) &&
 					this->entities[k].status == LINK) {
-					if (another_tmp != NULL && another_tmp->link->root != this->entities[k].link->root)
+					if (another_tmp != NULL && another_tmp->link->root != this->entities[k].link->root) {
 						form_path(another_tmp, &(this->entities[k]), &(this->entities[i]));
+						break;
+					}
 					if (this->entities[k].link->next.size() < 1 || this->entities[k].link->branch) {
 						another_tmp = &(this->entities[k]);
 						k_actual = k;
 					}
 				}
+			}
+			if (this->entities[i].status == PATH) {
+				continue;
 			}
 			/* This can happen if two entities sense the same linked entity (one will link with it before the other) */
 			if (another_tmp == NULL) {
@@ -383,6 +389,20 @@ bool population::terminate()
 }
 
 void population::form_path(individual *linked1, individual *linked2, individual *finder) {
+	linked_tree *prev;
+	linked_tree *tmp = linked1->link;
+	while (tmp->node != tmp->root) {
+		((individual *)tmp->node)->status = PATH;
+		tmp = tmp->previous;
+	}
+	tmp = linked2->link;
+	while (tmp->node != tmp->root) {
+		((individual *)tmp->node)->status = PATH;
+		tmp = tmp->previous;
+	}
+	finder->status = PATH;
+	finder->velocity = vector<double>(this->dim, 0);
+	finder->link = new linked_tree(linked1->link->root, linked1->link, finder);
 	std::cout << "FOUND A PATH" << std::endl;
 }
 
@@ -402,7 +422,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	}
 
 	for(unsigned int i = 0; i < num_objectives; ++i) {
-		objective *tmp = new objective(dimension, objective_radius, limit);
+		objective *tmp = new objective(dimension, objective_radius, limit, i);
 		this->objectives.push_back(tmp);
 	}
 
