@@ -10,6 +10,8 @@ double radius = 20;
 double ground_dimension = 1000;
 unsigned int number_objectives = 2;
 double objective_radius = 100;
+unsigned int branch_len = 5;
+double sense_dist = 100;
 
 /* those are fixed at the moment */
 unsigned int dimension_size = 2;
@@ -39,11 +41,11 @@ void render_function()
 		/* AI Loop: Perception -> Decision -> Action */
 		/* Preception */
 
-		test.sense();		
+		test.sense(sense_dist);		
 
 		/* Decision */
 
-		test.decide();
+		test.decide(sense_dist);
 
 		/* Action */
 		glColor3f(0.0, 0.0, 1.0);

@@ -2,6 +2,10 @@
 
 using namespace::std;
 
+class drawable;
+class objective;
+class individual;
+
 /* define a one bit data structure for bitmap */
 typedef struct one_bit
 {
@@ -17,6 +21,33 @@ enum states
 	READY,
 	RUNNING,
 	ON_OBJ,
+	LINK,
+	SENSE,
+	BRANCH,
+};
+
+/* Made this a global variable so main.cpp can set it at runtime. Maybe better way to do this? */
+extern unsigned int branch_len;
+
+/* Linked list that can branch after a defined number of nodes */
+class linked_tree
+{
+public:
+	/* Objective that this linked tree originates from */
+	objective *root;
+	/* Previous link which is closer in the tree to the root */
+	linked_tree *previous;
+	/* What is at this link in the linked tree */
+	drawable *node;
+	/* Distance from last branch */
+	unsigned int branch_dist;
+	/* Indicates if the tree can branch at this link */
+	bool branch = false;
+	/* Indicates if another entity can link off this link */
+	bool free = true;
+
+	linked_tree() = delete;
+	linked_tree(objective *r, linked_tree *p, drawable *n);
 };
 
 class drawable
@@ -33,6 +64,9 @@ public:
 
 	/* radius for entity since it is a circle */
 	double radius;
+
+	/* Assume any drawable can be placed in a linked tree, for now */
+	linked_tree *link;
 
 	/* construct functions */
 	drawable() = delete;
@@ -82,6 +116,9 @@ public:
 	bool if_collision(individual another);
 	bool if_collision(drawable another);
 
+	/* Sensing detection between this and given entity */
+	bool if_sense(individual another, double sense_dist);
+
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
 };
@@ -113,10 +150,10 @@ public:
 	population(unsigned int size, unsigned int dimension, double radius, double limit, unsigned int num_objectives, double objective_radius);
 
 	/* AI Perception function, each entity takes in input from the environment */
-	void sense();
+	void sense(double sense_dist);
 
 	/* AI Decision function, each entity makes a decision based on their current state */
-	void decide();
+	void decide(double sense_dist);
 
 	/* collision detection among all entities in this population */
 	bool collision();
