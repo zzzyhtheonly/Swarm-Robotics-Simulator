@@ -223,7 +223,12 @@ bool individual::if_sense(objective *another, double sense_dist) {
 
 void population::sense(double sense_dist)
 {
-	
+	sense_objectives(sense_dist);
+	sense_entities(sense_dist);
+}
+
+void population::sense_objectives(double sense_dist)
+{
 	for (unsigned int i = 0; i < this->pop_size; ++i){
 		if (this->entities[i].status == LINK || this->entities[i].status == PATH) continue;
 		/* Is an entity on top of an objective? */
@@ -233,8 +238,16 @@ void population::sense(double sense_dist)
 				this->entities[i].status = ON_OBJ;
 			}
 		}
+	}
+}
+
+void population::sense_entities(double sense_dist)
+{	
+	for (unsigned int i = 0; i < this->pop_size; ++i){
 		/* Continue to next entity if on objective */
-		if (this->entities[i].status == ON_OBJ)
+		if (this->entities[i].status == ON_OBJ ||
+			this->entities[i].status == LINK ||
+			this->entities[i].status == PATH)
 			continue;
 		/* Is an entity within sensing distance of another entity
 		who is in a linked tree? */
@@ -251,6 +264,12 @@ void population::sense(double sense_dist)
 
 void population::decide(double sense_dist)
 {
+	decide_link_objective(sense_dist);
+	decide_link_entity(sense_dist);	
+}
+
+void population::decide_link_objective(double sense_dist)
+{
 	for (unsigned int i = 0; i < this->pop_size; ++i){
 		/* If the entity sensed that it was on an objective */
 		if (this->entities[i].status == ON_OBJ) {
@@ -261,7 +280,7 @@ void population::decide(double sense_dist)
 					if (obj_tmp == NULL) {
 						obj_tmp = this->objectives[j];
 					} else {
-						std::cout << "A one link path between objectives has not been implemented yet T_T" << std::endl;
+						/* Single link between objectives would go here */
 					}
 				}
 			}
@@ -275,9 +294,14 @@ void population::decide(double sense_dist)
 			this->entities[i].status = LINK;
 			this->entities[i].velocity = vector<double>(this->dim, 0);
 			this->entities[i].link = new linked_tree(obj_tmp->link->root, obj_tmp->link, &(this->entities[i]));
-		/* If the entity sensed that it was within sensing distance of at least one
-		other linked entity */
-		} else if (this->entities[i].status == SENSE) {
+		}
+	}
+}
+
+void population::decide_link_entity(double sense_dist)
+{
+	for (unsigned int i = 0; i < this->pop_size; ++i){
+		if (this->entities[i].status == SENSE) {
 			/* Find the first linked entity that is also free or able to branch */
 			//std::cout << "Entity " << i << " is deciding what to do after sensing another linked entity" << std::endl;
 			individual *another_tmp = NULL;
