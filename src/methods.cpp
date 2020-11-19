@@ -227,6 +227,7 @@ void population::sense(double sense_dist)
 	sense_entities(sense_dist);
 }
 
+/* Is each entity within sensing distance of any of the objectives? */
 void population::sense_objectives(double sense_dist)
 {
 	for (unsigned int i = 0; i < this->pop_size; ++i){
@@ -241,6 +242,8 @@ void population::sense_objectives(double sense_dist)
 	}
 }
 
+/* Is each entity (who has not already sensed an objective, or is not already linked or
+within a path) within sensing distance of at least one other linked entity? */
 void population::sense_entities(double sense_dist)
 {	
 	for (unsigned int i = 0; i < this->pop_size; ++i){
@@ -268,6 +271,7 @@ void population::decide(double sense_dist)
 	decide_link_entity(sense_dist);	
 }
 
+/* An entity will always link with objectives */
 void population::decide_link_objective(double sense_dist)
 {
 	for (unsigned int i = 0; i < this->pop_size; ++i){
@@ -298,6 +302,8 @@ void population::decide_link_objective(double sense_dist)
 	}
 }
 
+/* Entities will try to link with other linked entities if possible (free link or branch)
+ If an entity can link with two linked entities from different linked_trees, a path is detected */
 void population::decide_link_entity(double sense_dist)
 {
 	for (unsigned int i = 0; i < this->pop_size; ++i){
