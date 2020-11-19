@@ -161,9 +161,14 @@ public:
 
 	/* AI Perception function, each entity takes in input from the environment */
 	void sense(double sense_dist);
+	void sense_objectives(double sense_dist);
+	void sense_entities(double sense_dist);
 
 	/* AI Decision function, each entity makes a decision based on their current state */
 	void decide(double sense_dist);
+	void decide_link_objective(double sense_dist);
+	void decide_path(double sense_dist);
+	void decide_link_entity(double sense_dist);
 
 	/* collision detection among all entities in this population */
 	bool collision();
@@ -173,11 +178,11 @@ public:
 
 	/* check if all entities terminate */
 	bool terminate();
+
+	void form_path(individual *linked1, individual *linked2, individual *finder);
 	
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
-
-	void form_path(individual *linked1, individual *linked2, individual *finder);
 };
 
 /* TODO: class to fit genetic algorithm */
