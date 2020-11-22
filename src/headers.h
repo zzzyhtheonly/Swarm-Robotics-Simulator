@@ -86,6 +86,10 @@ public:
 class objective : public drawable {
 public:
 	unsigned int id = -1;
+
+	/* collision detection between objectives, only could happen after initialization */
+	bool if_collision(objective *another);
+
 	/* construct functions */
 	objective() = delete;
 	objective(unsigned int dimension, double radius, double limit, unsigned int id);
@@ -172,6 +176,9 @@ public:
 
 	/* collision detection among all entities in this population */
 	bool collision();
+
+	/* collision detection only use after initialization */
+	bool init_collision();
 
 	/* adjust velocity of each entity with respect to collision detection */
 	void adjustment();

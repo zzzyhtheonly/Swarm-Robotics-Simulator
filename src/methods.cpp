@@ -167,6 +167,20 @@ void individual::move_prediction()
  * test base on pos_next because we make sure that there is no collision at initial
  * another: a specific entity to test collision
  */
+bool objective::if_collision(objective *another)
+{
+	double distance = 0;
+
+	for(unsigned int i = 0; i < this->dimension; ++i){
+		double tmp = this->pos[i] - another->pos[i];
+		distance += (tmp * tmp);
+	}
+
+	distance = sqrt(distance);
+
+	return distance < this->radius + another->radius ? true : false;
+}
+
 bool individual::if_collision(individual another)
 {
 	double distance = 0;
@@ -363,6 +377,49 @@ bool population::collision()
 	return res;
 }
 
+/* customized collsion test only used after initialization */
+bool population::init_collision()
+{
+	bool res = false;
+	
+	/* TODO: make it supports GPU */
+	// between entities
+	for(unsigned int i = 0; i < this->pop_size; ++i){
+		for(unsigned int j = i+1; j < this->pop_size; ++j){
+			if(this->entities[i].if_collision(this->entities[j])){
+				this->bm[i].bit = 1;
+				this->bm[j].bit = 1;
+				res = true;
+			}
+		}
+	}
+
+	// between objects
+	for(unsigned int i = 0; i < this->num_objs; ++i){
+		for(unsigned int j = i+1; j < this->num_objs; ++j){
+			if(this->objectives[i]->if_collision(this->objectives[j])){
+				this->bm[this->pop_size+i].bit = 1;
+				this->bm[this->pop_size+j].bit = 1;
+				res = true;
+			}
+		}
+	}
+
+	// between entities and objects
+	for(unsigned int i = 0; i < this->pop_size; ++i){
+		for(unsigned int j = 0; j < this->num_objs; ++j){
+			if(this->entities[i].if_collision(this->objectives[j])){
+				this->bm[i].bit = 1;
+				this->bm[this->pop_size+j].bit = 1;
+				res = true;
+			}
+		}
+	}
+
+	return res;
+	
+}
+
 /* adjuest velocity of each entity with respect to collision detection */
 void population::adjustment()
 {
@@ -454,16 +511,25 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	for(unsigned int i = 0; i < num_objectives; ++i) {
 		objective *tmp = new objective(dimension, objective_radius, limit, i);
 		this->objectives.push_back(tmp);
+		this->bm.push_back(one_bit());
 	}
 
 	unsigned int retries = 0;
 	/* make sure the population is initialized with no collision, give a retry limitation to prevent forever loop */
-	while(collision() && retries++ < 99){
+	while(init_collision() && retries++ < 99){
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < size; ++i){
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
 				this->entities[i] = individual(dimension, radius, limit, mode);
+			}
+		}
+
+		for(unsigned int i = 0; i < num_objectives; ++i){
+			if(this->bm[size+i].bit){
+				this->bm[size+i].bit = 0;
+				/* FIXME: memory leak here, we need a destructor to make it works properly */
+				this->objectives[i] = new objective(dimension, objective_radius, limit, i);
 			}
 		}
 	}
