@@ -2,7 +2,7 @@
 #include <GL/freeglut.h>
 #include <math.h>
 #include <bits/stdc++.h>
-#include <algorithm>
+
 #include "headers.h"
 
 linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
@@ -74,7 +74,7 @@ objective::objective(unsigned int dimension, double radius, double limit, unsign
  * radius: fix to 20 at the moment
  * limit: playground dimension limit, only square allowed, assume that you want a 1000*1000 square then limit should be 1000
  */
-individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id) : drawable(dimension, radius, limit)
+individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode) : drawable(dimension, radius, limit)
 {
 	this->dimension = dimension;
 	this->limit = limit;
@@ -84,7 +84,6 @@ individual::individual(unsigned int dimension, double radius, double limit, unsi
 	this->radius = radius;
 	this->status = READY;
 	this->mode = mode;
-	this->id = id;
 
 	/* initialize coordinates and velocities randomly */
 	random_device dev;
@@ -192,7 +191,6 @@ bool individual::if_collision(individual another)
 	}
 
 	distance = sqrt(distance);
-	//cout << distance << endl;
 
 	return distance < this->radius + another.radius ? true : false;
 }
@@ -235,11 +233,6 @@ bool individual::if_sense(objective *another, double sense_dist) {
 	distance = sqrt(distance);
 
 	return distance < this->radius + sense_dist + another->radius ? true : false;	
-}
-
-void individual::grid_coordinates(unsigned int &x, unsigned int &y, double limit, double cell) {
-	x = (unsigned int)((this->pos[0]+limit)/cell);
-	y = (unsigned int)((this->pos[1]+limit)/cell);	
 }
 
 void population::sense(double sense_dist)
@@ -368,55 +361,17 @@ void population::decide_link_entity(double sense_dist)
 /* test if collision exists otherwise update collision bitmap */
 bool population::collision()
 {
-
 	bool res = false;
-	unsigned int left_x, right_x, up_y, down_y;
-	double l = this->dim_limit;
-	double c = this->cell_size;
 
 	/* TODO: make it supports GPU */
-
 	for(unsigned int i = 0; i < this->pop_size; ++i){
-		//cout << "Collision for " << i << endl;
-
-		left_x = max(0u, (unsigned int)((this->entities[i].pos[0]+l-c)/c));
-		right_x = min(this->grid_size-1, (unsigned int)((this->entities[i].pos[0]+l+c)/c));
-		down_y = max(0u, (unsigned int)((this->entities[i].pos[1]+l-c)/c));
-		up_y = min(this->grid_size-1, (unsigned int)((this->entities[i].pos[1]+l+c)/c));
-
-		//cout << i << " | Left: " << left_x << " | Right: " << right_x << " | Up: " << up_y << " | Down: " << down_y << endl;
-		
-		for (unsigned int x = left_x; x <= right_x; x++) {
-			//cout << "Grid_x: " << x << endl;
-			for (unsigned int y = down_y; y <= up_y; y++) {
-				//cout << "Grid_y: " << y << endl;
-				for (unsigned int k = 0; k < this->grid[x][y].size(); k++) {
-					unsigned int j = this->grid[x][y][k];
-					if (i == j) continue;
-					//cout << " checking " << i << " and " << j << endl;
-					if (this->entities[i].if_collision(this->entities[j])) {
-						//cout << i << " collided with " << j << endl;
-						this->bm[i].bit=1;
-						this->bm[j].bit=1;
-						res = true;
-						//cout << i << " | " << j << " | "
-						//<< this->bm[i].bit << " | " << this->bm[j].bit << " | " << res << endl;
-					}
-				}
-				//if (i == 0) cout << "X: " << x << " | Y: " << y << " | SIZE: " << this->grid[x][y].size() << endl;
-			}
-		}
-		/**
 		for(unsigned int j = i+1; j < this->pop_size; ++j){
 			if(this->entities[i].if_collision(this->entities[j])){
-				if(this->bm[i].bit != 1 || this->bm[j].bit != 1 || res != true) {
-					cout << i << " -| " << j << " | "
-					<< this->bm[i].bit << " | " << this->bm[j].bit << " | " << res << endl;
-					exit(1);
-				}
+				this->bm[i].bit = 1;
+				this->bm[j].bit = 1;
+				res = true;
 			}
 		}
-		**/
 	}
 
 	return res;
@@ -521,7 +476,7 @@ bool population::terminate()
 }
 
 void population::form_path(individual *linked1, individual *linked2, individual *finder) {
-	//linked_tree *prev;
+	linked_tree *prev;
 	linked_tree *tmp = linked1->link;
 	while (tmp->node != tmp->root) {
 		((individual *)tmp->node)->status = PATH;
@@ -538,38 +493,6 @@ void population::form_path(individual *linked1, individual *linked2, individual 
 	std::cout << "FOUND A PATH" << std::endl;
 }
 
-
-void population::init_grid(double radius, double dimension_limit) {
-	this->cell_size = 1;
-	while (cell_size < (radius*2)) { cell_size *= 2; }
-	this->grid_size = ((dimension_limit*2)/cell_size)+1;
-
-	this->grid = new vector<unsigned int> *[grid_size];
-	for (unsigned int i = 0; i < grid_size; i++) {
-		this->grid[i] = new vector<unsigned int> [grid_size];
-		for (unsigned int j = 0; j < grid_size; j++) {
-			this->grid[i][j] = vector<unsigned int>();
-		}
-	}
-	std::cout << "Grid is " << grid_size << " by " << grid_size << " with cell size " << cell_size << std::endl;
-}
-
-void population::clear_grid() {
-	for (unsigned int i = 0; i < grid_size; i++) {
-		for (unsigned int j = 0; j < grid_size; j++) {
-			this->grid[i][j].clear();
-		}
-	}
-}
-
-void population::assign_to_grid() {
-	unsigned int grid_x,grid_y;
-	for (unsigned int i = 0; i < this->pop_size; i++) {
-		this->entities[i].grid_coordinates(grid_x, grid_y, this->dim_limit, this->cell_size);	
-		this->grid[grid_x][grid_y].push_back(this->entities[i].id);
-	}
-}
-
 /*
  * size: fix to 10 at the moment
  * others: same to the arguments of individual(...)
@@ -579,10 +502,9 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->pop_size = size;
 	this->num_objs = num_objectives;
 	this->dim = dimension;
-	this->dim_limit = limit;
 
 	for(unsigned int i = 0; i < size; ++i){
-		this->entities.push_back(individual(dimension, radius, limit, mode, i));
+		this->entities.push_back(individual(dimension, radius, limit, mode));
 		this->bm.push_back(one_bit());
 	}
 
@@ -599,7 +521,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		for(unsigned int i = 0; i < size; ++i){
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
-				this->entities[i] = individual(dimension, radius, limit, mode, i);
+				this->entities[i] = individual(dimension, radius, limit, mode);
 			}
 		}
 
@@ -620,8 +542,4 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 			   << endl;
 		exit(1);
 	}
-
-	this->init_grid(radius, limit);
-	this->clear_grid();
-	this->assign_to_grid();
 }

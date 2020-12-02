@@ -126,10 +126,7 @@ void render_function()
 			} else if (test.entities[i].status == PATH) {
 				glColor3f(.5, 0.0, .5);
 			} else {
-				if (i == 0)
-					glColor3f(1.0, 1.0, 1.0);
-				else
-					glColor3f(0.0, 0.0, 1.0);
+				glColor3f(0.0, 0.0, 1.0);
 			}
 
 			test.entities[i].draw();
@@ -150,12 +147,8 @@ void render_function()
 		check = clock();
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].move();
-			//if (i == 0) cout << test.entities[i].pos[0] << " - " << test.entities[i].pos[1] << endl;
 		}
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
-
-		test.clear_grid();
-		test.assign_to_grid();
 
 		/* for leftmost mode, check if all entities reach the rightmost */
 		if(mode == LEFTMOST_INIT && test.terminate()){
