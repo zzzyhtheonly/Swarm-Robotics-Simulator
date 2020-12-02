@@ -4,6 +4,7 @@ SRC_DIRS ?= ./src
 
 SRCS := $(wildcard $(SRC_DIRS)/*.cpp)
 OBJS := $(patsubst $(SRC_DIRS)/%.cpp,$(SRC_DIRS)/%.o,$(SRCS))
+DEPS:= $(OBJS:.o=.d)
 
 INC_DIRS := $(shell find $(SRC_DIRS) -type d)
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
