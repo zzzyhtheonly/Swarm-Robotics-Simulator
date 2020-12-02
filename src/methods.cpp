@@ -267,20 +267,42 @@ void population::sense_objectives(double sense_dist)
 within a path) within sensing distance of at least one other linked entity? */
 void population::sense_entities(double sense_dist)
 {	
-	for (unsigned int i = 0; i < this->pop_size; ++i){
-		/* Continue to next entity if on objective */
+
+	unsigned int left_x, right_x, up_y, down_y;
+	double l = this->dim_limit;
+	double c = this->cell_size;
+	double s = sense_dist + this->entities[0].radius*2;
+
+	/* TODO: make it supports GPU */
+
+	// Loop through each entity
+	for(unsigned int i = 0; i < this->pop_size; ++i){
+		/* Continue to next entity if in tree */
 		if (this->entities[i].status == ON_OBJ ||
 			this->entities[i].status == LINK ||
 			this->entities[i].status == PATH)
 			continue;
-		/* Is an entity within sensing distance of another entity
-		who is in a linked tree? */
-		for (unsigned int j = 0; j < this->pop_size; ++j) {
-			if (i == j) continue;
-			if (this->entities[i].if_sense(this->entities[j], sense_dist) && 
-				this->entities[j].status == LINK) {
-				//std::cout << "Entity " << i << " sensed entity " << j << std::endl;
-				this->entities[i].status = SENSE;
+		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
+		left_x = max(0, (int)(((this->entities[i].pos[0]+l)-s)/c));
+		right_x = min((int)this->grid_size-1, (int)(((this->entities[i].pos[0]+l)+s)/c));
+		down_y = max(0, (int)(((this->entities[i].pos[1]+l)-s)/c));
+		up_y = min((int)this->grid_size-1, (int)(((this->entities[i].pos[1]+l)+s)/c));
+		// Compare current entity to all other entities in current/adjacent cells
+		for (unsigned int x = left_x; x <= right_x; x++) {
+			for (unsigned int y = down_y; y <= up_y; y++) {
+				// Iterate through all entities in comparison cell
+				for (unsigned int k = 0; k < this->grid[x][y].size(); k++) {
+					// j = index of comparison entity (index in this->entities)
+					unsigned int j = this->grid[x][y][k];
+					// Check if "sensing self"
+					if (i == j) continue;
+					//cout << i << " | " << j << endl;
+					if (this->entities[i].if_sense(this->entities[j], sense_dist) && 
+						this->entities[j].status == LINK) {
+						//std::cout << "Entity " << i << " sensed entity " << j << std::endl;
+						this->entities[i].status = SENSE;
+					}
+				}
 			}
 		}
 	}
@@ -365,7 +387,8 @@ void population::decide_link_entity(double sense_dist)
 	}	
 }
 
-/* test if collision exists otherwise update collision bitmap */
+/* test if collision exists otherwise update collision bitmap 
+	comparisons are only made to nearby entities */
 bool population::collision()
 {
 
@@ -373,50 +396,35 @@ bool population::collision()
 	unsigned int left_x, right_x, up_y, down_y;
 	double l = this->dim_limit;
 	double c = this->cell_size;
+	double r = this->entities[0].radius*2;
 
 	/* TODO: make it supports GPU */
 
+	// Loop through each entity
 	for(unsigned int i = 0; i < this->pop_size; ++i){
-		//cout << "Collision for " << i << endl;
-
-		left_x = max(0u, (unsigned int)((this->entities[i].pos[0]+l-c)/c));
-		right_x = min(this->grid_size-1, (unsigned int)((this->entities[i].pos[0]+l+c)/c));
-		down_y = max(0u, (unsigned int)((this->entities[i].pos[1]+l-c)/c));
-		up_y = min(this->grid_size-1, (unsigned int)((this->entities[i].pos[1]+l+c)/c));
-
-		//cout << i << " | Left: " << left_x << " | Right: " << right_x << " | Up: " << up_y << " | Down: " << down_y << endl;
-		
+		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
+		left_x = max(0, (int)((this->entities[i].pos[0]+l-r)/c));
+		right_x = min((int)this->grid_size-1, (int)((this->entities[i].pos[0]+l+r)/c));
+		down_y = max(0, (int)((this->entities[i].pos[1]+l-r)/c));
+		up_y = min((int)this->grid_size-1, (int)((this->entities[i].pos[1]+l+r)/c));
+		// Compare current entity to all other entities in current/adjacent cells
 		for (unsigned int x = left_x; x <= right_x; x++) {
-			//cout << "Grid_x: " << x << endl;
 			for (unsigned int y = down_y; y <= up_y; y++) {
-				//cout << "Grid_y: " << y << endl;
+				// Iterate through all entities in comparison cell
 				for (unsigned int k = 0; k < this->grid[x][y].size(); k++) {
+					// j = index of comparison entity (index in this->entities)
 					unsigned int j = this->grid[x][y][k];
+					// Check if "comparing to self"
 					if (i == j) continue;
-					//cout << " checking " << i << " and " << j << endl;
+					// If colliding with another, then do collision behavior
 					if (this->entities[i].if_collision(this->entities[j])) {
-						//cout << i << " collided with " << j << endl;
 						this->bm[i].bit=1;
 						this->bm[j].bit=1;
 						res = true;
-						//cout << i << " | " << j << " | "
-						//<< this->bm[i].bit << " | " << this->bm[j].bit << " | " << res << endl;
 					}
 				}
-				//if (i == 0) cout << "X: " << x << " | Y: " << y << " | SIZE: " << this->grid[x][y].size() << endl;
 			}
 		}
-		/**
-		for(unsigned int j = i+1; j < this->pop_size; ++j){
-			if(this->entities[i].if_collision(this->entities[j])){
-				if(this->bm[i].bit != 1 || this->bm[j].bit != 1 || res != true) {
-					cout << i << " -| " << j << " | "
-					<< this->bm[i].bit << " | " << this->bm[j].bit << " | " << res << endl;
-					exit(1);
-				}
-			}
-		}
-		**/
 	}
 
 	return res;
@@ -565,6 +573,7 @@ void population::clear_grid() {
 void population::assign_to_grid() {
 	unsigned int grid_x,grid_y;
 	for (unsigned int i = 0; i < this->pop_size; i++) {
+		// grid_x, grid_y are being passed by reference
 		this->entities[i].grid_coordinates(grid_x, grid_y, this->dim_limit, this->cell_size);	
 		this->grid[grid_x][grid_y].push_back(this->entities[i].id);
 	}

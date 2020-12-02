@@ -85,6 +85,7 @@ void render_function()
 	double adjustment_time = 0;
 	double move_time = 0;
 	double draw_lines_time = 0;
+	double grid_time = 0;
 	clock_t start = clock();
 
 	check = clock();
@@ -126,10 +127,7 @@ void render_function()
 			} else if (test.entities[i].status == PATH) {
 				glColor3f(.5, 0.0, .5);
 			} else {
-				if (i == 0)
-					glColor3f(1.0, 1.0, 1.0);
-				else
-					glColor3f(0.0, 0.0, 1.0);
+				glColor3f(0.0, 0.0, 1.0);
 			}
 
 			test.entities[i].draw();
@@ -154,8 +152,10 @@ void render_function()
 		}
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
+		check = clock();
 		test.clear_grid();
 		test.assign_to_grid();
+		grid_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		/* for leftmost mode, check if all entities reach the rightmost */
 		if(mode == LEFTMOST_INIT && test.terminate()){
@@ -197,6 +197,7 @@ void render_function()
 			printf("\tAdjustments: %.2f%%\n", (adjustment_time/total_time)*100.);
 			printf("\tMoving: %.2f%%\n", (move_time/total_time)*100.);
 			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
+			printf("\tMaintaining grid: %.2f%%\n", (grid_time/total_time)*100.);
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
 			std::cout << "\nNumber of updates: " << timestamp-1 << std::endl;
 			save_screenshot("out.tga", 500, 500);
