@@ -15,8 +15,10 @@ OPENGLFLAGS := -lglut -lGL -lGLU#-lGLEW -lGLU
 $(TARGET): $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) $(OPENGLFLAGS) -o $@ $(LOADLIBES) $(LDLIBS)
 
+OTHERS := out.tga
+
 .PHONY: clean
 clean:
-	$(RM) $(TARGET) $(OBJS) $(DEPS)
+	$(RM) $(TARGET) $(OBJS) $(DEPS) $(OTHERS)
 
 -include $(DEPS)
