@@ -646,3 +646,100 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		exit(1);
 	}
 }
+
+
+#if GPU
+void Population::birth_robot()
+{
+  position_x.push_back(2.0);
+  position_y.push_back(2.5);
+
+  // velocity_x.push_back(2.0f * ((double)rand() / (double)RAND_MAX) - 1.0f);
+  // velocity_y.push_back(2.0f * ((double)rand() / (double)RAND_MAX) - 1.0f);
+
+  velocity_x.push_back(1.0);
+  velocity_y.push_back(1.0);
+  status.push_back(2);
+}
+
+void Population::advance_robot()
+{
+  // As we cannot send device vectors to the move (as device_vector is at
+  // the end of the day a GPU structure abstraction in CPU) we have to get the
+  // pointer in GPU memory in order for the move to know where to start 
+  // reading the double arrays from.
+  double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
+  double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
+  double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
+  double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
+  int* d_status = thrust::raw_pointer_cast(&status[0]);
+  /* This is the way I structured my blocks and threads. I fixed the amount of
+   * threads per block to 1024. So to get the amount of blocks we just get the
+   * total number of elements in positions and divide it by 1024. We add one in
+   * case the division leaves remainder.
+   *
+   * ┌──────────────────────grid─┬of─blocks─────────────────┬──────────
+   * │     block_of_threads      │     block_of_threads     │  
+   * │ ┌───┬───┬───────┬──────┐  │ ┌───┬───┬───────┬──────┐ │
+   * │ │ 0 │ 1 │ [...] │ 16   │  │ │ 0 │ 1 │ [...] │ 16   │ │   ...
+   * │ └───┴───┴───────┴──────┘  │ └───┴───┴───────┴──────┘ │
+   * └───────────────────────────┴──────────────────────────┴──────────
+   */
+
+  dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
+  dim3 threadsPerBlock(16, 1, 1);
+
+
+  move_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_velocity_x, d_velocity_y, d_status, pop_size);
+  cudaDeviceSynchronize();
+}
+
+__device__ __host__ void print_pos(double* position_x, double* position_y, int i){
+  printf("%f %f\n", position_x[i], position_y[i]);
+}
+
+/* pure move 
+ * return value: true means entity collides on walls
+ */
+__device__ __host__ 
+bool _g_move(unsigned int index, double *position_x, double *position_y, 
+  double * velocity_x, double *velocity_y, double limit)
+{
+  bool res = false;
+  double tmp = position_x[index] + velocity_x[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_x[index] = -velocity_x[index];
+        res = true;
+  }
+  tmp = position_y[index] + velocity_y[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_y[index] = -velocity_y[index];
+        res = true;
+  }
+  position_x[index] += velocity_x[index];
+  position_y[index] += velocity_y[index];
+  return res;
+}
+
+/* movement with respect to veclocity */
+__device__ __host__ 
+void g_move(unsigned int index, double *position_x, double *position_y, 
+  double * velocity_x, double *velocity_y, int *status, double limit)
+{
+  if(status[index] == 1){
+    status[index] = 2;
+    return;
+  }
+
+  if(status[index] == 2){
+    status[index] = 3;
+  }
+
+  _move(index, position_x, position_y, velocity_x, velocity_y, limit);
+  
+  /* update pos_next after real movement */
+  // for(unsigned int i = 0; i < this->dimension; ++i){
+  //   this->pos_next[i] = this->pos[i];
+  // }
+}
+#endif

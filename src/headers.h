@@ -1,8 +1,12 @@
 #include <vector>
+#include <iostream>
+#include <iomanip>
+#include <cstdlib>
 
 #ifdef GPU
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include <thrust/device_vector.h>
 #endif
 
 #define RANDOM_INIT 0
@@ -159,6 +163,18 @@ public:
 class population
 {
 public:
+
+#if GPU
+    thrust::device_vector<double> position_x;
+    thrust::device_vector<double> position_y;
+    thrust::device_vector<double> velocity_x;
+    thrust::device_vector<double> velocity_y; 
+    thrust::device_vector<int> status;
+	
+	void birth_robot();       // pushes back one more robot data to the device_vectors
+    void advance_robot();    // launches the move that adds velocity to positions
+#endif
+
 	/* population size */
 	unsigned int pop_size;
 
