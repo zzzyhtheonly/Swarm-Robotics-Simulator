@@ -100,7 +100,7 @@ public:
 	drawable(unsigned int dimension, double radius, double limit, unsigned int id);
 
 	/* draw circle */
-	void draw();
+	void draw(double r, double g, double b);
 };
 
 /* Used to differentiate objectives from other drawables

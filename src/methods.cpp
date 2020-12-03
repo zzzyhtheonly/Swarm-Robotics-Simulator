@@ -2,7 +2,7 @@
 #include <GL/freeglut.h>
 #include <math.h>
 #include <bits/stdc++.h>
-
+#include <string>
 #include "headers.h"
 
 #ifdef GPU
@@ -62,7 +62,7 @@ drawable::drawable(unsigned int dimension, double radius, double limit, unsigned
 }
 
 /* draw itself in OpenGL by filling with tiny triangles */
-void drawable::draw()
+void drawable::draw(double r, double g, double b)
 {
 	unsigned int count = 20;
 	GLfloat twicePi = 2.0f * M_PI;
@@ -71,7 +71,8 @@ void drawable::draw()
 
 		/* center */
 #ifdef GPU
-		log_file << this->id << "\t" << g_pos_x[this->id] << "\t" << g_pos_y[this->id] << std::endl;
+		log_file << this->id << "\t" << g_pos_x[this->id] << "\t" << g_pos_y[this->id] 
+			<< "\t" << r << "\t" << g << "\t" << b << "\t" << std::endl;
 		/*
 		glVertex2f(g_pos_x[this->id], g_pos_y[this->id]);
 		for(unsigned int i = 0; i <= count; ++i) {

@@ -93,19 +93,20 @@ void render_function()
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
-
+/*
 #ifdef GPU
 	cout << "end of gpu version" << endl;
 	return;
 #endif
-
+*/
+	double r,g,b;
 	while(timestamp++){
 		/* Draw objectives, no AI here */
 		glColor3f(1.0, 0.0, 0.0);
-		
+		r = 1.; g = 0.; b = 0.;
 		check = clock();
 		for(unsigned int i = 0; i < test.num_objs; ++i){
-			test.objectives[i]->draw();
+			test.objectives[i]->draw(r,g,b);
 		}
 		draw_obj_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
@@ -127,17 +128,22 @@ void render_function()
 		check = clock();
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			if (test.entities[i].status == LINK) {
-				if (test.entities[i].link->branch)
+				if (test.entities[i].link->branch) {
 					glColor3f(0.0, 1.0, 0.5);
-				else
+					r = 0.; g = 1.; b = .5;
+				} else {
 					glColor3f(0.0, 1.0, 0.0);
+					r = 0.; g = 1.; b = 0.;
+				}
 			} else if (test.entities[i].status == PATH) {
 				glColor3f(.5, 0.0, .5);
+				r = .5; g = 0.; b = .5;
 			} else {
 				glColor3f(0.0, 0.0, 1.0);
+				r = 0.; g = 0.; b = 1.;
 			}
 
-			test.entities[i].draw();
+			test.entities[i].draw(r,g,b);
 		}
 		draw_entities_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
@@ -267,6 +273,9 @@ int main(int argc, char* argv[])
 	if (optind < argc){
 		max_time = atoi(argv[optind++]);
 	}
+	log_file << "Ground_Dim:\t" << std::to_string(ground_dimension) << std::endl
+		<< "Radius:\t" << std::to_string(radius) << std::endl
+		<< "Objective_Rad:\t" << std::to_string(radius) << std::endl;
 
 #ifdef GPU
 	render_function();
