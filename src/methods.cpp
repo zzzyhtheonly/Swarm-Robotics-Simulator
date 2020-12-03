@@ -11,6 +11,24 @@ double *g_pos_y = nullptr;
 double *g_pos_next_x = nullptr;
 double *g_pos_next_y = nullptr;
 char *g_bm = nullptr;
+
+__device__ __host__ void print_pos(double*, double*, int);
+
+
+__device__ __host__ void g_move(unsigned int, double *, double *, double * , double *, int *, double);
+__device__ __host__ bool _g_move(unsigned int , double *, double *, double *, double *, double );
+
+// This is the move that is launched from CPU and GPU runs it for each cell
+__global__ void move_kernel(double *position_x, double *position_y, double *velocity_x, double *velocity_y, int *status, int pop_size)
+{
+    unsigned int index = blockDim.x * blockIdx.x + threadIdx.x;
+    if (index >= pop_size) return;
+    g_move(index, position_x, position_y, velocity_x, velocity_y, status, 1000.0);
+    // position_x[index] += velocity_x[index];
+    // position_y[index] += velocity_y[index];
+    printf("%d, %f %f\n", index, position_x[index], position_y[index]);
+    // positions[index] = index; // use this one for debugging the index
+}
 #endif
 
 linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
@@ -648,8 +666,8 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 }
 
 
-#if GPU
-void Population::birth_robot()
+#ifdef GPU
+void population::birth_robot()
 {
   position_x.push_back(2.0);
   position_y.push_back(2.5);
@@ -662,7 +680,7 @@ void Population::birth_robot()
   status.push_back(2);
 }
 
-void Population::advance_robot()
+void population::advance_robot()
 {
   // As we cannot send device vectors to the move (as device_vector is at
   // the end of the day a GPU structure abstraction in CPU) we have to get the

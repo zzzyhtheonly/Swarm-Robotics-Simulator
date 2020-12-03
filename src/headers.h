@@ -164,7 +164,7 @@ class population
 {
 public:
 
-#if GPU
+#ifdef GPU
     thrust::device_vector<double> position_x;
     thrust::device_vector<double> position_y;
     thrust::device_vector<double> velocity_x;
