@@ -91,6 +91,11 @@ void render_function()
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
+#ifdef GPU
+	cout << "end of gpu version" << endl;
+	return;
+#endif
+
 	while(timestamp++){
 		/* Draw objectives, no AI here */
 		glColor3f(1.0, 0.0, 0.0);
