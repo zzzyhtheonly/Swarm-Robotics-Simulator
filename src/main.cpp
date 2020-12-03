@@ -206,7 +206,9 @@ void render_function()
 			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
 			save_screenshot("out.tga", 500, 500);
+#ifdef GPU
 			log_file.close();
+#endif
 			exit(0);
 		}
 
@@ -273,11 +275,11 @@ int main(int argc, char* argv[])
 	if (optind < argc){
 		max_time = atoi(argv[optind++]);
 	}
+#ifdef GPU
 	log_file << "Ground_Dim:\t" << std::to_string(ground_dimension) << std::endl
 		<< "Radius:\t" << std::to_string(radius) << std::endl
 		<< "Objective_Rad:\t" << std::to_string(radius) << std::endl;
 
-#ifdef GPU
 	render_function();
 #else
 	/* init window */
