@@ -212,6 +212,7 @@ void render_function()
 
 		glFlush();
 		clear_screen();
+		log_file << "CLEAR" << std::endl;
 	}
 
 	glFlush();
@@ -274,7 +275,9 @@ int main(int argc, char* argv[])
 		max_time = atoi(argv[optind++]);
 	}
 	log_file << "Ground_Dim:\t" << std::to_string(ground_dimension) << std::endl
+		<< "Num_Entites:\t" << std::to_string(population_size) << std::endl
 		<< "Radius:\t" << std::to_string(radius) << std::endl
+		<< "NUM_Obj:\t" << std::to_string(number_objectives) << std::endl
 		<< "Objective_Rad:\t" << std::to_string(radius) << std::endl;
 
 #ifdef GPU
