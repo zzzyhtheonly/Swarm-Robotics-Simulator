@@ -138,7 +138,7 @@ public:
 
 	/* construct functions */
 	individual() = delete;
-	individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id);
+	individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id, population& p);
 
 	/* no checks move, return true if there is collisions with walls */
 	bool _move(vector<double>&);
@@ -169,12 +169,16 @@ public:
 #ifdef GPU
     thrust::device_vector<double> position_x;
     thrust::device_vector<double> position_y;
+	thrust::device_vector<double> position_next_x;
+    thrust::device_vector<double> position_next_y;
     thrust::device_vector<double> velocity_x;
     thrust::device_vector<double> velocity_y; 
     thrust::device_vector<int> status;
+	thrust::device_vector<unsigned int:1> g_bm;
 	
 	void birth_robot();       // pushes back one more robot data to the device_vectors
     void advance_robot();    // launches the move that adds velocity to positions
+	bool g_if_collision(unsigned int, unsigned int, bool, bool, double, double);
 #endif
 
 	/* population size */

@@ -6,11 +6,13 @@
 #include "headers.h"
 
 #ifdef GPU
+#if 0 
 double *g_pos_x = nullptr;
 double *g_pos_y = nullptr;
 double *g_pos_next_x = nullptr;
 double *g_pos_next_y = nullptr;
 char *g_bm = nullptr;
+#endif
 
 __device__ __host__ void print_pos(double*, double*, int);
 
@@ -71,9 +73,9 @@ drawable::drawable(unsigned int dimension, double radius, double limit, unsigned
 		this->pos[i] = sign(rng) ? val : -val;
 #ifdef GPU
 		if(i == 0){
-			g_pos_x[id] = pos[i];
+			p.position_x.push_back(pos[i]);
 		} else if(i == 1){
-			g_pos_y[id] = pos[i];
+			p.position_y.push_back(pos[i]);
 		}
 #endif
 	}
@@ -119,7 +121,7 @@ objective::objective(unsigned int dimension, double radius, double limit, unsign
  * radius: fix to 20 at the moment
  * limit: playground dimension limit, only square allowed, assume that you want a 1000*1000 square then limit should be 1000
  */
-individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id) : drawable(dimension, radius, limit, id)
+individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id, population& p) : drawable(dimension, radius, limit, id)
 {
 	this->id = id;
 	this->dimension = dimension;
@@ -157,9 +159,13 @@ individual::individual(unsigned int dimension, double radius, double limit, unsi
 		this->velocity[i] = sign(rng) ? fixed_velocity : -fixed_velocity;
 #ifdef GPU	
 		if(i == 0){
-			g_pos_x[id] = g_pos_next_x[id] = pos[i];
+			p.position_x.push_back(pos[i]);
+			p.position_next_x.push_back(pos[i]);
+			p.veclocity_x.push_back(velocity[i]);
 		} else if(i == 1){
-			g_pos_y[id] = g_pos_next_y[id] = pos[i];
+			p.position_y.push_back(pos[i]);
+			p.position_next_y.push_back(pos[i]);
+			p.veclocity_y.push_back(velocity[i]);
 		}
 #endif
 	}
@@ -223,15 +229,15 @@ void individual::move_prediction()
  */
 #ifdef GPU
 /* test collision base on given two indices */
-bool g_if_collision(unsigned int first, unsigned int second, bool first_use_pos_next, bool second_use_pos_next, double first_radius, double second_radius)
+bool population::g_if_collision(unsigned int first, unsigned int second, bool first_use_pos_next, bool second_use_pos_next, double first_radius, double second_radius)
 {
 	double distance = 0;
 	double x1, x2, y1, y2;
 
-	x1 = first_use_pos_next ? g_pos_next_x[first] : g_pos_x[first];
-	x2 = second_use_pos_next ? g_pos_next_x[second] : g_pos_x[second];
-	y1 = first_use_pos_next ? g_pos_next_y[first] : g_pos_y[first];
-	y2 = second_use_pos_next ? g_pos_next_y[second] : g_pos_y[second];
+	x1 = first_use_pos_next ? this->position_next_x[first] : this->position_x[first];
+	x2 = second_use_pos_next ? this->position_next_x[second] : this->position_x[second];
+	y1 = first_use_pos_next ? this->position_next_y[first] : this->position_y[first];
+	y2 = second_use_pos_next ? this->position_next_y[second] : this->position_y[second];
 	
 	double tmp = x1 - x2;
 	distance += (tmp * tmp);
@@ -605,18 +611,21 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->dim = dimension;
 
 #ifdef GPU
+#if 0
 	gpu_uni_malloc((void **) &g_pos_x, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_y, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_next_x, size * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_next_y, size * sizeof(double));
 	gpu_uni_malloc((void **) &g_bm, (size+num_objectives) * sizeof(char));
 #endif
+	
+#endif
 
 	for(unsigned int i = 0; i < size; ++i){
 		this->entities.push_back(individual(dimension, radius, limit, mode, i));
 		this->bm.push_back(one_bit());
 #ifdef GPU
-		g_bm[i] = 0;
+		g_bm.push_back(0);
 #endif
 	}
 
@@ -625,7 +634,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		this->objectives.push_back(tmp);
 		this->bm.push_back(one_bit());
 #ifdef GPU
-		g_bm[i] = 0;
+		g_bm.push_back(0);
 #endif
 	}
 
