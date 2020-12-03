@@ -6,11 +6,13 @@
 #include "headers.h"
 
 #ifdef GPU
+#if 0 
 double *g_pos_x = nullptr;
 double *g_pos_y = nullptr;
 double *g_pos_next_x = nullptr;
 double *g_pos_next_y = nullptr;
 char *g_bm = nullptr;
+#endif
 
 __device__ __host__ void print_pos(double*, double*, int);
 
@@ -52,7 +54,7 @@ linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
 }
 
 /** Parent class for things that need to be displayed on screen **/
-drawable::drawable(unsigned int dimension, double radius, double limit, unsigned int id)
+drawable::drawable(unsigned int dimension, double radius, double limit, unsigned int id, population& p)
 {
 	this->id = id;
 	this->dimension = dimension;
@@ -71,9 +73,9 @@ drawable::drawable(unsigned int dimension, double radius, double limit, unsigned
 		this->pos[i] = sign(rng) ? val : -val;
 #ifdef GPU
 		if(i == 0){
-			g_pos_x[id] = pos[i];
+			p.position_x[id] = pos[i];
 		} else if(i == 1){
-			g_pos_y[id] = pos[i];
+			p.position_y[id] = pos[i];
 		}
 #endif
 	}
@@ -89,8 +91,8 @@ void drawable::draw(double r, double g, double b)
 
 		/* center */
 #ifdef GPU
-		log_file << this->id << "\t" << g_pos_x[this->id] << "\t" << g_pos_y[this->id] 
-			<< "\t" << r << "\t" << g << "\t" << b << "\t" << std::endl;
+		//log_file << this->id << "\t" << g_pos_x[this->id] << "\t" << g_pos_y[this->id] 
+			//<< "\t" << r << "\t" << g << "\t" << b << "\t" << std::endl;
 		/*
 		glVertex2f(g_pos_x[this->id], g_pos_y[this->id]);
 		for(unsigned int i = 0; i <= count; ++i) {
@@ -107,7 +109,7 @@ void drawable::draw(double r, double g, double b)
 	glEnd();
 }
 
-objective::objective(unsigned int dimension, double radius, double limit, unsigned int id) : drawable(dimension, radius, limit, id) {
+objective::objective(unsigned int dimension, double radius, double limit, unsigned int id, population& p) : drawable(dimension, radius, limit, id, p) {
 	/* Set my id */
 	this->id = id;	
 	/* Establish root of linked tree */
@@ -119,7 +121,7 @@ objective::objective(unsigned int dimension, double radius, double limit, unsign
  * radius: fix to 20 at the moment
  * limit: playground dimension limit, only square allowed, assume that you want a 1000*1000 square then limit should be 1000
  */
-individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id) : drawable(dimension, radius, limit, id)
+individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id, population& p) : drawable(dimension, radius, limit, id, p)
 {
 	this->id = id;
 	this->dimension = dimension;
@@ -157,9 +159,13 @@ individual::individual(unsigned int dimension, double radius, double limit, unsi
 		this->velocity[i] = sign(rng) ? fixed_velocity : -fixed_velocity;
 #ifdef GPU	
 		if(i == 0){
-			g_pos_x[id] = g_pos_next_x[id] = pos[i];
+			p.position_x[id] = pos[i];
+			p.position_next_x[id] = pos[i];
+			p.velocity_x[id] = velocity[i];
 		} else if(i == 1){
-			g_pos_y[id] = g_pos_next_y[id] = pos[i];
+			p.position_y[id] = pos[i];
+			p.position_next_y[id] = pos[i];
+			p.velocity_y[id] = velocity[i];
 		}
 #endif
 	}
@@ -223,15 +229,15 @@ void individual::move_prediction()
  */
 #ifdef GPU
 /* test collision base on given two indices */
-bool g_if_collision(unsigned int first, unsigned int second, bool first_use_pos_next, bool second_use_pos_next, double first_radius, double second_radius)
+bool population::g_if_collision(unsigned int first, unsigned int second, bool first_use_pos_next, bool second_use_pos_next, double first_radius, double second_radius)
 {
 	double distance = 0;
 	double x1, x2, y1, y2;
 
-	x1 = first_use_pos_next ? g_pos_next_x[first] : g_pos_x[first];
-	x2 = second_use_pos_next ? g_pos_next_x[second] : g_pos_x[second];
-	y1 = first_use_pos_next ? g_pos_next_y[first] : g_pos_y[first];
-	y2 = second_use_pos_next ? g_pos_next_y[second] : g_pos_y[second];
+	x1 = first_use_pos_next ? this->position_next_x[first] : this->position_x[first];
+	x2 = second_use_pos_next ? this->position_next_x[second] : this->position_x[second];
+	y1 = first_use_pos_next ? this->position_next_y[first] : this->position_y[first];
+	y2 = second_use_pos_next ? this->position_next_y[second] : this->position_y[second];
 	
 	double tmp = x1 - x2;
 	distance += (tmp * tmp);
@@ -603,17 +609,27 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->pop_size = size;
 	this->num_objs = num_objectives;
 	this->dim = dimension;
+	this->position_x = thrust::device_vector<double>(size+num_objectives, 0);
+	this->position_y = thrust::device_vector<double>(size+num_objectives, 0);
+	this->position_next_x = thrust::device_vector<double>(size, 0);
+	this->position_next_y = thrust::device_vector<double>(size, 0);
+	this->velocity_x = thrust::device_vector<double>(size, 0);
+	this->velocity_y = thrust::device_vector<double>(size, 0);
+	this->g_bm = thrust::device_vector<char>(size+num_objectives, 0);
 
 #ifdef GPU
+#if 0
 	gpu_uni_malloc((void **) &g_pos_x, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_y, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_next_x, size * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_next_y, size * sizeof(double));
 	gpu_uni_malloc((void **) &g_bm, (size+num_objectives) * sizeof(char));
 #endif
+	
+#endif
 
 	for(unsigned int i = 0; i < size; ++i){
-		this->entities.push_back(individual(dimension, radius, limit, mode, i));
+		this->entities.push_back(individual(dimension, radius, limit, mode, i, *this));
 		this->bm.push_back(one_bit());
 #ifdef GPU
 		g_bm[i] = 0;
@@ -621,11 +637,11 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	}
 
 	for(unsigned int i = 0; i < num_objectives; ++i) {
-		objective *tmp = new objective(dimension, objective_radius, limit, size+i);
+		objective *tmp = new objective(dimension, objective_radius, limit, size+i, *this);
 		this->objectives.push_back(tmp);
 		this->bm.push_back(one_bit());
 #ifdef GPU
-		g_bm[i] = 0;
+		g_bm[size+i] = 0;
 #endif
 	}
 
@@ -641,7 +657,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
 #endif
-				this->entities[i] = individual(dimension, radius, limit, mode, i);
+				this->entities[i] = individual(dimension, radius, limit, mode, i, *this);
 			}
 		}
 
@@ -654,7 +670,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 				this->bm[size+i].bit = 0;
 #endif
 				/* FIXME: memory leak here, we need a destructor to make it works properly */
-				this->objectives[i] = new objective(dimension, objective_radius, limit, size+i);
+				this->objectives[i] = new objective(dimension, objective_radius, limit, size+i, *this);
 			}
 		}
 	}
