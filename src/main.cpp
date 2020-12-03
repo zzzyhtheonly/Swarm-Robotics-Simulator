@@ -86,7 +86,10 @@ void render_function()
 	double move_time = 0;
 	double draw_lines_time = 0;
 	double grid_time = 0;
+	double video_time = 0;
 	clock_t start = clock();
+	clock_t last_video = clock();
+	unsigned int video_ctr = 0;
 
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
@@ -198,11 +201,22 @@ void render_function()
 			printf("\tMoving: %.2f%%\n", (move_time/total_time)*100.);
 			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
 			printf("\tMaintaining grid: %.2f%%\n", (grid_time/total_time)*100.);
+			printf("\tRendering video: %.2f%%\n", (video_time/total_time)*100.);
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
 			std::cout << "\nNumber of updates: " << timestamp-1 << std::endl;
-			save_screenshot("out.tga", 500, 500);
+			save_screenshot("out.tga", 500, 500);	
 			exit(0);
 		}
+		
+		check = clock();
+		double time_since_last_screen = ((double)(clock() - last_video))/ CLOCKS_PER_SEC;
+		if (time_since_last_screen > 0.025) {
+			save_screenshot("./video/"  + std::to_string(video_ctr) + ".tga", 500, 500);
+			video_ctr++;
+			last_video = clock();
+		}
+		video_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+		
 
 		glFlush();
 		clear_screen();
