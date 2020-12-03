@@ -264,6 +264,7 @@ int main(int argc, char* argv[])
 		max_time = atoi(argv[optind++]);
 	}
 
+#if 0
 	/* init window */
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE);
@@ -273,5 +274,8 @@ int main(int argc, char* argv[])
 	/* display */
 	glutDisplayFunc(render_function);
 	glutMainLoop();
+	return 0;
+#endif
+	render_function();
 	return 0;
 }

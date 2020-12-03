@@ -753,7 +753,7 @@ void g_move(unsigned int index, double *position_x, double *position_y,
     status[index] = 3;
   }
 
-  _move(index, position_x, position_y, velocity_x, velocity_y, limit);
+  _g_move(index, position_x, position_y, velocity_x, velocity_y, limit);
   
   /* update pos_next after real movement */
   // for(unsigned int i = 0; i < this->dimension; ++i){
