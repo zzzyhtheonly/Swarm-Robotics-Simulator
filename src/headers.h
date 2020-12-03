@@ -1,9 +1,26 @@
 #include <vector>
 
+#ifdef GPU
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+#endif
+
 #define RANDOM_INIT 0
 #define LEFTMOST_INIT 1
 
 using namespace::std;
+
+/* refine every GPU-friendly variables as global pointers for GPU version*/
+#ifdef GPU
+/* should be pop_size + num_objs, could be found in class population, only support 2 dimension at the moment */
+extern double *g_pos_x;
+extern double *g_pos_y;
+/* should be pop_size */
+extern double *g_pos_next_x;
+extern double *g_pos_next_y;
+/* should be pop_size + num_objs, could be found in class population */
+extern char *g_bm;
+#endif
 
 class drawable;
 class objective;
@@ -58,6 +75,9 @@ public:
 class drawable
 {
 public:
+	/* unqiue id for each entity */
+	unsigned int id;
+
 	/* dimension of our space, fixed to 2 at this moment */
 	unsigned int dimension;
 
@@ -75,7 +95,7 @@ public:
 
 	/* construct functions */
 	drawable() = delete;
-	drawable(unsigned int dimension, double radius, double limit);
+	drawable(unsigned int dimension, double radius, double limit, unsigned int id);
 
 	/* draw circle */
 	void draw();
@@ -85,8 +105,6 @@ public:
    Can expand this later */
 class objective : public drawable {
 public:
-	unsigned int id = -1;
-
 	/* collision detection between objectives, only could happen after initialization */
 	bool if_collision(objective *another);
 
@@ -114,7 +132,7 @@ public:
 
 	/* construct functions */
 	individual() = delete;
-	individual(unsigned int dimension, double radius, double limit, unsigned int mode);
+	individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id);
 
 	/* no checks move, return true if there is collisions with walls */
 	bool _move(vector<double>&);

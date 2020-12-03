@@ -4,10 +4,6 @@
 #include <unistd.h>
 #include <time.h> 
 
-#ifdef GPU
-#include <cuda.h>
-#endif
-
 #include "headers.h"
 
 /* arguments */
