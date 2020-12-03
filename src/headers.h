@@ -117,7 +117,7 @@ public:
 
 	/* construct functions */
 	objective() = delete;
-	objective(unsigned int dimension, double radius, double limit, unsigned int id);
+	objective(unsigned int dimension, double radius, double limit, unsigned int id, population& p);
 
 };
 

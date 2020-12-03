@@ -73,9 +73,9 @@ drawable::drawable(unsigned int dimension, double radius, double limit, unsigned
 		this->pos[i] = sign(rng) ? val : -val;
 #ifdef GPU
 		if(i == 0){
-			p.position_x.push_back(pos[i]);
+			p.position_x[id] = pos[i];
 		} else if(i == 1){
-			p.position_y.push_back(pos[i]);
+			p.position_y[id] = pos[i];
 		}
 #endif
 	}
@@ -91,8 +91,8 @@ void drawable::draw(double r, double g, double b)
 
 		/* center */
 #ifdef GPU
-		log_file << this->id << "\t" << g_pos_x[this->id] << "\t" << g_pos_y[this->id] 
-			<< "\t" << r << "\t" << g << "\t" << b << "\t" << std::endl;
+		//log_file << this->id << "\t" << g_pos_x[this->id] << "\t" << g_pos_y[this->id] 
+			//<< "\t" << r << "\t" << g << "\t" << b << "\t" << std::endl;
 		/*
 		glVertex2f(g_pos_x[this->id], g_pos_y[this->id]);
 		for(unsigned int i = 0; i <= count; ++i) {
@@ -109,7 +109,7 @@ void drawable::draw(double r, double g, double b)
 	glEnd();
 }
 
-objective::objective(unsigned int dimension, double radius, double limit, unsigned int id) : drawable(dimension, radius, limit, id) {
+objective::objective(unsigned int dimension, double radius, double limit, unsigned int id, population& p) : drawable(dimension, radius, limit, id, p) {
 	/* Set my id */
 	this->id = id;	
 	/* Establish root of linked tree */
@@ -121,7 +121,7 @@ objective::objective(unsigned int dimension, double radius, double limit, unsign
  * radius: fix to 20 at the moment
  * limit: playground dimension limit, only square allowed, assume that you want a 1000*1000 square then limit should be 1000
  */
-individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id, population& p) : drawable(dimension, radius, limit, id)
+individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id, population& p) : drawable(dimension, radius, limit, id, p)
 {
 	this->id = id;
 	this->dimension = dimension;
@@ -159,13 +159,13 @@ individual::individual(unsigned int dimension, double radius, double limit, unsi
 		this->velocity[i] = sign(rng) ? fixed_velocity : -fixed_velocity;
 #ifdef GPU	
 		if(i == 0){
-			p.position_x.push_back(pos[i]);
-			p.position_next_x.push_back(pos[i]);
-			p.velocity_x.push_back(velocity[i]);
+			p.position_x[id] = pos[i];
+			p.position_next_x[id] = pos[i];
+			p.velocity_x[id] = velocity[i];
 		} else if(i == 1){
-			p.position_y.push_back(pos[i]);
-			p.position_next_y.push_back(pos[i]);
-			p.velocity_y.push_back(velocity[i]);
+			p.position_y[id] = pos[i];
+			p.position_next_y[id] = pos[i];
+			p.velocity_y[id] = velocity[i];
 		}
 #endif
 	}
@@ -609,6 +609,13 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->pop_size = size;
 	this->num_objs = num_objectives;
 	this->dim = dimension;
+	this->position_x = thrust::device_vector<double>(size+num_objectives, 0);
+	this->position_y = thrust::device_vector<double>(size+num_objectives, 0);
+	this->position_next_x = thrust::device_vector<double>(size, 0);
+	this->position_next_y = thrust::device_vector<double>(size, 0);
+	this->velocity_x = thrust::device_vector<double>(size, 0);
+	this->velocity_y = thrust::device_vector<double>(size, 0);
+	this->g_bm = thrust::device_vector<char>(size+num_objectives, 0);
 
 #ifdef GPU
 #if 0
@@ -625,7 +632,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		this->entities.push_back(individual(dimension, radius, limit, mode, i, *this));
 		this->bm.push_back(one_bit());
 #ifdef GPU
-		g_bm.push_back(0);
+		g_bm[i] = 0;
 #endif
 	}
 
@@ -634,7 +641,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		this->objectives.push_back(tmp);
 		this->bm.push_back(one_bit());
 #ifdef GPU
-		g_bm.push_back(0);
+		g_bm[size+i] = 0;
 #endif
 	}
 
@@ -663,7 +670,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 				this->bm[size+i].bit = 0;
 #endif
 				/* FIXME: memory leak here, we need a destructor to make it works properly */
-				this->objectives[i] = new objective(dimension, objective_radius, limit, size+i);
+				this->objectives[i] = new objective(dimension, objective_radius, limit, size+i, *this);
 			}
 		}
 	}

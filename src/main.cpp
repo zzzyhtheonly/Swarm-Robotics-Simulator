@@ -93,12 +93,13 @@ void render_function()
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
-/*
 #ifdef GPU
 	cout << "end of gpu version" << endl;
+	cout << test.position_x[test.pop_size] << endl;
+	cout << test.position_next_x[test.pop_size-2] << endl;
+	cout << (int)test.g_bm[test.pop_size-2] << endl;
 	return;
 #endif
-*/
 	double r,g,b;
 	while(timestamp++){
 		/* Draw objectives, no AI here */
