@@ -69,6 +69,37 @@ void clear_screen()
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
+vector<string> tokenize(string line) {
+	cout << "Tokenizing: " << line << endl;
+        vector<string> words;
+        int i = 0;
+        int j = 0;
+        while (i < line.size()) {
+                if (line[i] == '\t' || i == line.size()-1) {
+                        words.push_back(line.substr(j, i-j));
+                        j = i+1;
+                }
+                i++;
+        }
+	cout << "Found " << words.size() << " words" << endl;
+        return words;
+}
+
+
+void render_log()
+{
+	ifstream log_in("log2.txt");
+	string line;
+	vector<string> words;
+	while(getline(log_in, line)) {
+		words = tokenize(line);
+		for (int i = 0; i < words.size(); i++) {
+			cout << words[i] << endl;
+		}
+	}
+	return;
+}
+
 void render_function()
 {
 	clear_screen();
@@ -239,10 +270,13 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	while((opt = getopt(argc, argv, "rt")) != -1)
+	while((opt = getopt(argc, argv, "lrt")) != -1)
 	{
 		switch(opt)
 		{
+			case 'l':
+				render_log();
+				exit(0);
 			case 'r':
 				mode = RANDOM_INIT;
 				break;
