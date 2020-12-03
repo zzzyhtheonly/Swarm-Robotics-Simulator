@@ -1,4 +1,5 @@
 #include <vector>
+#include <fstream>
 
 #ifdef GPU
 #include <cuda.h>
@@ -20,6 +21,7 @@ extern double *g_pos_next_x;
 extern double *g_pos_next_y;
 /* should be pop_size + num_objs, could be found in class population */
 extern char *g_bm;
+extern ofstream log_file;
 #endif
 
 class drawable;

@@ -19,6 +19,9 @@ unsigned int max_time = 300;
 
 /* those are fixed at the moment */
 unsigned int dimension_size = 2;
+#ifdef GPU
+ofstream log_file("log.txt");
+#endif
 
 // Source: http://www.david-amador.com/2012/09/how-to-take-screenshot-in-opengl/
 bool save_screenshot(string filename, int w, int h)
@@ -197,6 +200,7 @@ void render_function()
 			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
 			save_screenshot("out.tga", 500, 500);
+			log_file.close();
 			exit(0);
 		}
 
@@ -264,6 +268,9 @@ int main(int argc, char* argv[])
 		max_time = atoi(argv[optind++]);
 	}
 
+#ifdef GPU
+	render_function();
+#else
 	/* init window */
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE);
@@ -273,5 +280,6 @@ int main(int argc, char* argv[])
 	/* display */
 	glutDisplayFunc(render_function);
 	glutMainLoop();
+#endif
 	return 0;
 }

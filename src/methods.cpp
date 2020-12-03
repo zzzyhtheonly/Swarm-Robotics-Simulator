@@ -71,10 +71,13 @@ void drawable::draw()
 
 		/* center */
 #ifdef GPU
+		log_file << this->id << "\t" << g_pos_x[this->id] << "\t" << g_pos_y[this->id] << std::endl;
+		/*
 		glVertex2f(g_pos_x[this->id], g_pos_y[this->id]);
 		for(unsigned int i = 0; i <= count; ++i) {
 			glVertex2f(g_pos_x[this->id] + (radius * cos(i * twicePi / count)), g_pos_y[this->id] + (radius * sin(i * twicePi / count)));
 		}
+		*/
 #else
 		glVertex2f(pos[0], pos[1]);
 
