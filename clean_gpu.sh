@@ -5,4 +5,4 @@ rm -f *.o
 mv main.cu main.cpp
 mv methods.cu methods.cpp
 cd ..
-rm -f simulator out.tga
+rm -f simulator out.tga log.txt

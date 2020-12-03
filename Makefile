@@ -12,7 +12,7 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 CPPFLAGS ?= $(INC_FLAGS) -std=c++11 -MMD -MP -Wall -g
 OPENGLFLAGS := -lglut -lGL -lGLU#-lGLEW -lGLU
 
-OTHERS := out.tga
+OTHERS := out.tga log.txt
 
 $(TARGET): $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) $(OPENGLFLAGS) -o $@ $(LOADLIBES) $(LDLIBS)

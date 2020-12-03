@@ -2,6 +2,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
+#include <fstream>
 
 #ifdef GPU
 #include <cuda.h>
@@ -24,6 +25,7 @@ extern double *g_pos_next_x;
 extern double *g_pos_next_y;
 /* should be pop_size + num_objs, could be found in class population */
 extern char *g_bm;
+extern ofstream log_file;
 #endif
 
 class drawable;
@@ -102,7 +104,7 @@ public:
 	drawable(unsigned int dimension, double radius, double limit, unsigned int id);
 
 	/* draw circle */
-	void draw();
+	void draw(double r, double g, double b);
 };
 
 /* Used to differentiate objectives from other drawables
