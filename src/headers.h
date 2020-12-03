@@ -31,6 +31,7 @@ extern ofstream log_file;
 class drawable;
 class objective;
 class individual;
+class population;
 
 /* define a one bit data structure for bitmap */
 typedef struct one_bit
@@ -101,7 +102,7 @@ public:
 
 	/* construct functions */
 	drawable() = delete;
-	drawable(unsigned int dimension, double radius, double limit, unsigned int id);
+	drawable(unsigned int dimension, double radius, double limit, unsigned int id, population& p);
 
 	/* draw circle */
 	void draw(double r, double g, double b);
@@ -174,7 +175,7 @@ public:
     thrust::device_vector<double> velocity_x;
     thrust::device_vector<double> velocity_y; 
     thrust::device_vector<int> status;
-	thrust::device_vector<unsigned int:1> g_bm;
+	thrust::device_vector<char> g_bm;
 	
 	void birth_robot();       // pushes back one more robot data to the device_vectors
     void advance_robot();    // launches the move that adds velocity to positions

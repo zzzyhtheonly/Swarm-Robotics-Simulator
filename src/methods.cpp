@@ -54,7 +54,7 @@ linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
 }
 
 /** Parent class for things that need to be displayed on screen **/
-drawable::drawable(unsigned int dimension, double radius, double limit, unsigned int id)
+drawable::drawable(unsigned int dimension, double radius, double limit, unsigned int id, population& p)
 {
 	this->id = id;
 	this->dimension = dimension;
@@ -161,11 +161,11 @@ individual::individual(unsigned int dimension, double radius, double limit, unsi
 		if(i == 0){
 			p.position_x.push_back(pos[i]);
 			p.position_next_x.push_back(pos[i]);
-			p.veclocity_x.push_back(velocity[i]);
+			p.velocity_x.push_back(velocity[i]);
 		} else if(i == 1){
 			p.position_y.push_back(pos[i]);
 			p.position_next_y.push_back(pos[i]);
-			p.veclocity_y.push_back(velocity[i]);
+			p.velocity_y.push_back(velocity[i]);
 		}
 #endif
 	}
@@ -622,7 +622,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 #endif
 
 	for(unsigned int i = 0; i < size; ++i){
-		this->entities.push_back(individual(dimension, radius, limit, mode, i));
+		this->entities.push_back(individual(dimension, radius, limit, mode, i, *this));
 		this->bm.push_back(one_bit());
 #ifdef GPU
 		g_bm.push_back(0);
@@ -630,7 +630,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	}
 
 	for(unsigned int i = 0; i < num_objectives; ++i) {
-		objective *tmp = new objective(dimension, objective_radius, limit, size+i);
+		objective *tmp = new objective(dimension, objective_radius, limit, size+i, *this);
 		this->objectives.push_back(tmp);
 		this->bm.push_back(one_bit());
 #ifdef GPU
@@ -650,7 +650,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
 #endif
-				this->entities[i] = individual(dimension, radius, limit, mode, i);
+				this->entities[i] = individual(dimension, radius, limit, mode, i, *this);
 			}
 		}
 
