@@ -718,8 +718,8 @@ void population::advance_robot()
   int* d_status = thrust::raw_pointer_cast(&status[0]);
 
 
-  dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
-  dim3 threadsPerBlock(16, 1, 1);
+  dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+  dim3 threadsPerBlock(10, 1, 1);
 
 
   move_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_position_next_x,
@@ -768,9 +768,19 @@ void g_move(unsigned int index, double *position_x, double *position_y, double *
     status[index] = 3;
   }
 
-  _g_move(index, position_x, position_y, velocity_x, velocity_y, limit);
+  double tmp = position_x[index] + velocity_x[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_x[index] = -velocity_x[index];
+  }
+  tmp = position_y[index] + velocity_y[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_y[index] = -velocity_y[index];
+  }
+  position_x[index] += velocity_x[index];
+  position_y[index] += velocity_y[index];
   
   /* update pos_next after real movement */
-  position_next_x[index] = position_next_y[index];
+  position_next_x[index] = position_x[index];
+  position_next_y[index] = position_y[index];
 }
 #endif
