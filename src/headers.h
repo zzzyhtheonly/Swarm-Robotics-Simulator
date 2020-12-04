@@ -1,14 +1,38 @@
 #include <vector>
 #include <list>
+#include <iostream>
+#include <iomanip>
+#include <cstdlib>
+#include <fstream>
+
+#ifdef GPU
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+#include <thrust/device_vector.h>
+#endif
 
 #define RANDOM_INIT 0
 #define LEFTMOST_INIT 1
 
 using namespace::std;
 
+/* refine every GPU-friendly variables as global pointers for GPU version*/
+#ifdef GPU
+/* should be pop_size + num_objs, could be found in class population, only support 2 dimension at the moment */
+extern double *g_pos_x;
+extern double *g_pos_y;
+/* should be pop_size */
+extern double *g_pos_next_x;
+extern double *g_pos_next_y;
+/* should be pop_size + num_objs, could be found in class population */
+extern char *g_bm;
+extern ofstream log_file;
+#endif
+
 class drawable;
 class objective;
 class individual;
+class population;
 
 /* define a one bit data structure for bitmap */
 typedef struct one_bit
@@ -59,6 +83,9 @@ public:
 class drawable
 {
 public:
+	/* unqiue id for each entity */
+	unsigned int id;
+
 	/* dimension of our space, fixed to 2 at this moment */
 	unsigned int dimension;
 
@@ -76,24 +103,22 @@ public:
 
 	/* construct functions */
 	drawable() = delete;
-	drawable(unsigned int dimension, double radius, double limit);
+	drawable(unsigned int dimension, double radius, double limit, unsigned int id, population& p);
 
 	/* draw circle */
-	void draw();
+	void draw(double r, double g, double b);
 };
 
 /* Used to differentiate objectives from other drawables
    Can expand this later */
 class objective : public drawable {
 public:
-	unsigned int id = -1;
-
 	/* collision detection between objectives, only could happen after initialization */
 	bool if_collision(objective *another);
 
 	/* construct functions */
 	objective() = delete;
-	objective(unsigned int dimension, double radius, double limit, unsigned int id);
+	objective(unsigned int dimension, double radius, double limit, unsigned int id, population& p);
 
 };
 
@@ -116,7 +141,7 @@ public:
 
 	/* construct functions */
 	individual() = delete;
-	individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id);
+	individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id, population& p);
 
 	/* no checks move, return true if there is collisions with walls */
 	bool _move(vector<double>&);
@@ -145,6 +170,22 @@ public:
 class population
 {
 public:
+
+#ifdef GPU
+    thrust::device_vector<double> position_x;
+    thrust::device_vector<double> position_y;
+	thrust::device_vector<double> position_next_x;
+    thrust::device_vector<double> position_next_y;
+    thrust::device_vector<double> velocity_x;
+    thrust::device_vector<double> velocity_y; 
+    thrust::device_vector<int> status;
+	thrust::device_vector<char> g_bm;
+	
+	void birth_robot();       // pushes back one more robot data to the device_vectors
+    void advance_robot();    // launches the move that adds velocity to positions
+	bool g_if_collision(unsigned int, unsigned int, bool, bool, double, double);
+#endif
+
 	/* population size */
 	unsigned int pop_size;
 
