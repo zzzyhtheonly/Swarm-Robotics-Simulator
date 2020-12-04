@@ -127,6 +127,9 @@ void draw_circle(bool isObj, double x, double y){
 }
 
 void render_log_function() {
+	clear_screen();
+        glOrtho(-ground_dimension, ground_dimension, -ground_dimension, ground_dimension, -ground_dimension, ground_dimension);
+
 	string line;
 	vector<string> words;
 	double x,y,r,g,b;
@@ -134,7 +137,7 @@ void render_log_function() {
 
         while(getline(log_in, line)) {
                 words = tokenize(line);
-                if (words[0] == CLR_STR) {
+                if (words.size() <= 1) {
                         glFlush();
                         clear_screen();
                 } else {
