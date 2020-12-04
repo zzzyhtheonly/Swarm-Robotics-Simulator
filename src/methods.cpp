@@ -611,6 +611,8 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->pop_size = size;
 	this->num_objs = num_objectives;
 	this->dim = dimension;
+
+#ifdef GPU
 	this->position_x = thrust::device_vector<double>(size+num_objectives, 0);
 	this->position_y = thrust::device_vector<double>(size+num_objectives, 0);
 	this->position_next_x = thrust::device_vector<double>(size, 0);
@@ -618,8 +620,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->velocity_x = thrust::device_vector<double>(size, 0);
 	this->velocity_y = thrust::device_vector<double>(size, 0);
 	this->g_bm = thrust::device_vector<char>(size+num_objectives, 0);
-
-#ifdef GPU
+	this->limit = limit;
 #if 0
 	gpu_uni_malloc((void **) &g_pos_x, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_y, (size+num_objectives) * sizeof(double));

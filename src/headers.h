@@ -176,6 +176,7 @@ public:
     thrust::device_vector<double> velocity_y; 
     thrust::device_vector<int> status;
 	thrust::device_vector<char> g_bm;
+	double limit;
 	
 	void birth_robot();       // pushes back one more robot data to the device_vectors
     void advance_robot();    // launches the move that adds velocity to positions
