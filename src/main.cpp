@@ -30,6 +30,7 @@ unsigned int dimension_size = 2;
 #ifdef GPU
 ofstream log_file("log.txt");
 #endif
+ifstream log_in("log2.txt");
 
 // Source: http://www.david-amador.com/2012/09/how-to-take-screenshot-in-opengl/
 bool save_screenshot(string filename, int w, int h)
@@ -125,35 +126,49 @@ void draw_circle(bool isObj, double x, double y){
 	glEnd();
 }
 
-void render_log()
-{
-	ifstream log_in("log2.txt");
+void render_log_function() {
 	string line;
 	vector<string> words;
 	double x,y,r,g,b;
 	int id;
 
+        while(getline(log_in, line)) {
+                words = tokenize(line);
+                if (words[0] == CLR_STR) {
+                        glFlush();
+                        clear_screen();
+                } else {
+                        id = stoi(words[0]);
+                        x = stod(words[1]);
+                        y = stod(words[2]);
+                        r = stod(words[3]);
+                        g = stod(words[4]);
+                        b = stod(words[5]);
+                        glColor3f(r,g,b);
+                        draw_circle((id>=population_size), x,y);
+                }
+        }
+        return;
+}
+
+void render_log()
+{
+	string line;
 	for (int i = 0; i < 5; i++) {
 		getline(log_in, line);
 		parse_global_params(tokenize(line));
 	}
 
-	while(getline(log_in, line)) {
-		words = tokenize(line);
-		if (words[0] == CLR_STR) {
-			glFlush();
-			clear_screen();
-		} else {
-			id = stoi(words[0]);
-			x = stod(words[1]);
-			y = stod(words[2]);
-			r = stod(words[3]);
-			g = stod(words[4]);
-			b = stod(words[5]);
-			glColor3f(r,g,b);
-			draw_circle((id>=population_size), x,y);
-		}
-	}
+	/* init window */
+        //glutInit(&argc, argv);
+        glutInitDisplayMode(GLUT_SINGLE);
+        glutInitWindowSize(500, 500);
+        glutInitWindowPosition(100, 100);
+        glutCreateWindow("Robots simulator demo - rendering log file");
+        /* display */
+        glutDisplayFunc(render_log_function);
+        glutMainLoop();
+
 	return;
 }
 
