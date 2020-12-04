@@ -199,12 +199,15 @@ void render_function()
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
-/*
+  
 #ifdef GPU
 	cout << "end of gpu version" << endl;
+	cout << test.position_x[test.pop_size] << endl;
+	cout << test.position_next_x[test.pop_size-2] << endl;
+	cout << (int)test.g_bm[test.pop_size-2] << endl;
 	return;
 #endif
-*/
+  
 	double r,g,b;
 	while(timestamp++){
 		/* Draw objectives, no AI here */
@@ -312,7 +315,9 @@ void render_function()
 			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
 			save_screenshot("out.tga", 500, 500);
+#ifdef GPU
 			log_file.close();
+#endif
 			exit(0);
 		}
 
@@ -383,6 +388,7 @@ int main(int argc, char* argv[])
 	if (optind < argc){
 		max_time = atoi(argv[optind++]);
 	}
+
 	log_file << GRD_DIM_STR << "\t" << std::to_string(ground_dimension) << std::endl
 		<< NUM_ENT_STR << "\t" << std::to_string(population_size) << std::endl
 		<< RAD_STR << "\t" << std::to_string(radius) << std::endl

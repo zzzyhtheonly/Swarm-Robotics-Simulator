@@ -6,11 +6,31 @@
 #include "headers.h"
 
 #ifdef GPU
+#if 0 
 double *g_pos_x = nullptr;
 double *g_pos_y = nullptr;
 double *g_pos_next_x = nullptr;
 double *g_pos_next_y = nullptr;
 char *g_bm = nullptr;
+#endif
+
+__device__ __host__ void print_pos(double*, double*, int);
+
+
+__device__ __host__ void g_move(unsigned int, double *, double *, double * , double *, int *, double);
+__device__ __host__ bool _g_move(unsigned int , double *, double *, double *, double *, double );
+
+// This is the move that is launched from CPU and GPU runs it for each cell
+__global__ void move_kernel(double *position_x, double *position_y, double *velocity_x, double *velocity_y, int *status, int pop_size)
+{
+    unsigned int index = blockDim.x * blockIdx.x + threadIdx.x;
+    if (index >= pop_size) return;
+    g_move(index, position_x, position_y, velocity_x, velocity_y, status, 1000.0);
+    // position_x[index] += velocity_x[index];
+    // position_y[index] += velocity_y[index];
+    printf("%d, %f %f\n", index, position_x[index], position_y[index]);
+    // positions[index] = index; // use this one for debugging the index
+}
 #endif
 
 linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
@@ -34,7 +54,7 @@ linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
 }
 
 /** Parent class for things that need to be displayed on screen **/
-drawable::drawable(unsigned int dimension, double radius, double limit, unsigned int id)
+drawable::drawable(unsigned int dimension, double radius, double limit, unsigned int id, population& p)
 {
 	this->id = id;
 	this->dimension = dimension;
@@ -53,9 +73,9 @@ drawable::drawable(unsigned int dimension, double radius, double limit, unsigned
 		this->pos[i] = sign(rng) ? val : -val;
 #ifdef GPU
 		if(i == 0){
-			g_pos_x[id] = pos[i];
+			p.position_x[id] = pos[i];
 		} else if(i == 1){
-			g_pos_y[id] = pos[i];
+			p.position_y[id] = pos[i];
 		}
 #endif
 	}
@@ -89,7 +109,7 @@ void drawable::draw(double r, double g, double b)
 	glEnd();
 }
 
-objective::objective(unsigned int dimension, double radius, double limit, unsigned int id) : drawable(dimension, radius, limit, id) {
+objective::objective(unsigned int dimension, double radius, double limit, unsigned int id, population& p) : drawable(dimension, radius, limit, id, p) {
 	/* Set my id */
 	this->id = id;	
 	/* Establish root of linked tree */
@@ -101,7 +121,7 @@ objective::objective(unsigned int dimension, double radius, double limit, unsign
  * radius: fix to 20 at the moment
  * limit: playground dimension limit, only square allowed, assume that you want a 1000*1000 square then limit should be 1000
  */
-individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id) : drawable(dimension, radius, limit, id)
+individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id, population& p) : drawable(dimension, radius, limit, id, p)
 {
 	this->id = id;
 	this->dimension = dimension;
@@ -139,9 +159,13 @@ individual::individual(unsigned int dimension, double radius, double limit, unsi
 		this->velocity[i] = sign(rng) ? fixed_velocity : -fixed_velocity;
 #ifdef GPU	
 		if(i == 0){
-			g_pos_x[id] = g_pos_next_x[id] = pos[i];
+			p.position_x[id] = pos[i];
+			p.position_next_x[id] = pos[i];
+			p.velocity_x[id] = velocity[i];
 		} else if(i == 1){
-			g_pos_y[id] = g_pos_next_y[id] = pos[i];
+			p.position_y[id] = pos[i];
+			p.position_next_y[id] = pos[i];
+			p.velocity_y[id] = velocity[i];
 		}
 #endif
 	}
@@ -205,15 +229,15 @@ void individual::move_prediction()
  */
 #ifdef GPU
 /* test collision base on given two indices */
-bool g_if_collision(unsigned int first, unsigned int second, bool first_use_pos_next, bool second_use_pos_next, double first_radius, double second_radius)
+bool population::g_if_collision(unsigned int first, unsigned int second, bool first_use_pos_next, bool second_use_pos_next, double first_radius, double second_radius)
 {
 	double distance = 0;
 	double x1, x2, y1, y2;
 
-	x1 = first_use_pos_next ? g_pos_next_x[first] : g_pos_x[first];
-	x2 = second_use_pos_next ? g_pos_next_x[second] : g_pos_x[second];
-	y1 = first_use_pos_next ? g_pos_next_y[first] : g_pos_y[first];
-	y2 = second_use_pos_next ? g_pos_next_y[second] : g_pos_y[second];
+	x1 = first_use_pos_next ? this->position_next_x[first] : this->position_x[first];
+	x2 = second_use_pos_next ? this->position_next_x[second] : this->position_x[second];
+	y1 = first_use_pos_next ? this->position_next_y[first] : this->position_y[first];
+	y2 = second_use_pos_next ? this->position_next_y[second] : this->position_y[second];
 	
 	double tmp = x1 - x2;
 	distance += (tmp * tmp);
@@ -585,17 +609,27 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->pop_size = size;
 	this->num_objs = num_objectives;
 	this->dim = dimension;
+	this->position_x = thrust::device_vector<double>(size+num_objectives, 0);
+	this->position_y = thrust::device_vector<double>(size+num_objectives, 0);
+	this->position_next_x = thrust::device_vector<double>(size, 0);
+	this->position_next_y = thrust::device_vector<double>(size, 0);
+	this->velocity_x = thrust::device_vector<double>(size, 0);
+	this->velocity_y = thrust::device_vector<double>(size, 0);
+	this->g_bm = thrust::device_vector<char>(size+num_objectives, 0);
 
 #ifdef GPU
+#if 0
 	gpu_uni_malloc((void **) &g_pos_x, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_y, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_next_x, size * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_next_y, size * sizeof(double));
 	gpu_uni_malloc((void **) &g_bm, (size+num_objectives) * sizeof(char));
 #endif
+	
+#endif
 
 	for(unsigned int i = 0; i < size; ++i){
-		this->entities.push_back(individual(dimension, radius, limit, mode, i));
+		this->entities.push_back(individual(dimension, radius, limit, mode, i, *this));
 		this->bm.push_back(one_bit());
 #ifdef GPU
 		g_bm[i] = 0;
@@ -603,11 +637,11 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	}
 
 	for(unsigned int i = 0; i < num_objectives; ++i) {
-		objective *tmp = new objective(dimension, objective_radius, limit, size+i);
+		objective *tmp = new objective(dimension, objective_radius, limit, size+i, *this);
 		this->objectives.push_back(tmp);
 		this->bm.push_back(one_bit());
 #ifdef GPU
-		g_bm[i] = 0;
+		g_bm[size+i] = 0;
 #endif
 	}
 
@@ -623,7 +657,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
 #endif
-				this->entities[i] = individual(dimension, radius, limit, mode, i);
+				this->entities[i] = individual(dimension, radius, limit, mode, i, *this);
 			}
 		}
 
@@ -636,7 +670,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 				this->bm[size+i].bit = 0;
 #endif
 				/* FIXME: memory leak here, we need a destructor to make it works properly */
-				this->objectives[i] = new objective(dimension, objective_radius, limit, size+i);
+				this->objectives[i] = new objective(dimension, objective_radius, limit, size+i, *this);
 			}
 		}
 	}
@@ -650,3 +684,100 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		exit(1);
 	}
 }
+
+
+#ifdef GPU
+void population::birth_robot()
+{
+  position_x.push_back(2.0);
+  position_y.push_back(2.5);
+
+  // velocity_x.push_back(2.0f * ((double)rand() / (double)RAND_MAX) - 1.0f);
+  // velocity_y.push_back(2.0f * ((double)rand() / (double)RAND_MAX) - 1.0f);
+
+  velocity_x.push_back(1.0);
+  velocity_y.push_back(1.0);
+  status.push_back(2);
+}
+
+void population::advance_robot()
+{
+  // As we cannot send device vectors to the move (as device_vector is at
+  // the end of the day a GPU structure abstraction in CPU) we have to get the
+  // pointer in GPU memory in order for the move to know where to start 
+  // reading the double arrays from.
+  double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
+  double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
+  double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
+  double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
+  int* d_status = thrust::raw_pointer_cast(&status[0]);
+  /* This is the way I structured my blocks and threads. I fixed the amount of
+   * threads per block to 1024. So to get the amount of blocks we just get the
+   * total number of elements in positions and divide it by 1024. We add one in
+   * case the division leaves remainder.
+   *
+   * ┌──────────────────────grid─┬of─blocks─────────────────┬──────────
+   * │     block_of_threads      │     block_of_threads     │  
+   * │ ┌───┬───┬───────┬──────┐  │ ┌───┬───┬───────┬──────┐ │
+   * │ │ 0 │ 1 │ [...] │ 16   │  │ │ 0 │ 1 │ [...] │ 16   │ │   ...
+   * │ └───┴───┴───────┴──────┘  │ └───┴───┴───────┴──────┘ │
+   * └───────────────────────────┴──────────────────────────┴──────────
+   */
+
+  dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
+  dim3 threadsPerBlock(16, 1, 1);
+
+
+  move_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_velocity_x, d_velocity_y, d_status, pop_size);
+  cudaDeviceSynchronize();
+}
+
+__device__ __host__ void print_pos(double* position_x, double* position_y, int i){
+  printf("%f %f\n", position_x[i], position_y[i]);
+}
+
+/* pure move 
+ * return value: true means entity collides on walls
+ */
+__device__ __host__ 
+bool _g_move(unsigned int index, double *position_x, double *position_y, 
+  double * velocity_x, double *velocity_y, double limit)
+{
+  bool res = false;
+  double tmp = position_x[index] + velocity_x[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_x[index] = -velocity_x[index];
+        res = true;
+  }
+  tmp = position_y[index] + velocity_y[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_y[index] = -velocity_y[index];
+        res = true;
+  }
+  position_x[index] += velocity_x[index];
+  position_y[index] += velocity_y[index];
+  return res;
+}
+
+/* movement with respect to veclocity */
+__device__ __host__ 
+void g_move(unsigned int index, double *position_x, double *position_y, 
+  double * velocity_x, double *velocity_y, int *status, double limit)
+{
+  if(status[index] == 1){
+    status[index] = 2;
+    return;
+  }
+
+  if(status[index] == 2){
+    status[index] = 3;
+  }
+
+  _g_move(index, position_x, position_y, velocity_x, velocity_y, limit);
+  
+  /* update pos_next after real movement */
+  // for(unsigned int i = 0; i < this->dimension; ++i){
+  //   this->pos_next[i] = this->pos[i];
+  // }
+}
+#endif
