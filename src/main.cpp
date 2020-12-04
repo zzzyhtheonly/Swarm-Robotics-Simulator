@@ -98,7 +98,6 @@ void render_function()
 	cout << test.position_x[test.pop_size] << endl;
 	cout << test.position_next_x[test.pop_size-2] << endl;
 	cout << (int)test.g_bm[test.pop_size-2] << endl;
-	return;
 #endif
 	double r,g,b;
 	while(timestamp++){
