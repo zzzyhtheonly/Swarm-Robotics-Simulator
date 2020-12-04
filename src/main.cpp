@@ -151,7 +151,7 @@ void render_log_function() {
         return;
 }
 
-void render_log()
+void render_log(int *argcp, char **argv)
 {
 	string line;
 	for (int i = 0; i < 5; i++) {
@@ -160,7 +160,7 @@ void render_log()
 	}
 
 	/* init window */
-        //glutInit(&argc, argv);
+        glutInit(argcp, argv);
         glutInitDisplayMode(GLUT_SINGLE);
         glutInitWindowSize(500, 500);
         glutInitWindowPosition(100, 100);
@@ -347,7 +347,7 @@ int main(int argc, char* argv[])
 		switch(opt)
 		{
 			case 'l':
-				render_log();
+				render_log(&argc, argv);
 				exit(0);
 			case 'r':
 				mode = RANDOM_INIT;
