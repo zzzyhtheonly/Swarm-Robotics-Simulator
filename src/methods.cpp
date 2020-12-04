@@ -231,6 +231,27 @@ void individual::move_prediction()
  */
 #ifdef GPU
 /* test collision base on given two indices */
+__device__ __host__
+bool g_if_collision(double* pos_x, double* pos_y, unsigned int first, unsigned int second, double first_radius, double second_radius)
+{
+	double distance = 0;
+	double x1, x2, y1, y2;
+	
+	x1 = pos_x[first];
+	x2 = pos_x[second];
+	y1 = pos_y[first];
+	y2 = pos_y[second];
+	
+	double tmp = x1 - x2;
+	distance += (tmp * tmp);
+	tmp = y1 - y2;
+	distance += (tmp * tmp);
+
+	distance = sqrt(distance);
+
+	return distance < first_radius + second_radius ? true : false;
+}
+
 bool population::g_if_collision(unsigned int first, unsigned int second, bool first_use_pos_next, bool second_use_pos_next, double first_radius, double second_radius)
 {
 	double distance = 0;
@@ -473,6 +494,56 @@ void population::decide_link_entity(double sense_dist)
 
 /* test if collision exists otherwise update collision bitmap 
 	comparisons are only made to nearby entities */
+#ifdef GPU
+#if 0
+__device__ __host__
+void inner_collision_kernel(unsigned int pop_size, double radius, unsigned int i, bool& res, double* pos_x, double* pos_y, char* d_bm)
+{
+	unsigned int j = blockDim.x * blockIdx.x + threadIdx.x;
+    if (j <= i || j >= pop_size) return;
+	
+	res = g_if_collision(pos_x, pos_y, i, j, radius, radius) ? true : res;
+	
+}
+#endif
+
+__global__
+void collision_kernel(unsigned int pop_size, double radius, bool& res, double* pos_x, double* pos_y, char* d_bm)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size) return;
+
+#if 0	
+	dim3 blocksPerGrid(ceil((pop_size)/16.0), 1, 1);
+	dim3 threadsPerBlock(16, 1, 1);
+
+	inner_collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(pop_size, radius, i, res, pos_x, pos_y, d_bm);
+#endif
+	
+	for(unsigned int j = i+1; j < pop_size; ++j){
+		if(g_if_collision(pos_x, pos_y, i, j, radius, radius)){
+			d_bm[i] = 1;
+			d_bm[j] = 1;
+			res = true;
+		}
+	}
+}
+
+__global__
+void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radiu2, bool& res, double* pos_x, double* pos_y, char* d_bm)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size) return;
+	
+	for(unsigned int j = 0; j < obj_size; ++j){
+		if(g_if_collision(pos_x, pos_y, i, pop_size + j, radius1, radius2)){
+			d_bm[i] = 1;
+			d_bm[pop_size+j] = 1;
+			res = true;
+		}
+	}
+}
+
 bool population::collision()
 {
 
@@ -484,6 +555,17 @@ bool population::collision()
 
 	/* TODO: make it supports GPU */
 
+#ifdef GPU
+	double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
+	double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
+	char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
+
+	dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
+	dim3 threadsPerBlock(16, 1, 1);
+
+	collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, this->entities[0].radius, res, d_position_x, d_position_y, d_bm);
+	cudaDeviceSynchronize();
+#else
 	// Loop through each entity
 	for(unsigned int i = 0; i < this->pop_size; ++i){
 		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
@@ -510,6 +592,7 @@ bool population::collision()
 			}
 		}
 	}
+#endif
 
 	return res;
 }
@@ -520,17 +603,31 @@ bool population::init_collision()
 	bool res = false;
 	
 #ifdef GPU
-	for(unsigned int i = 0; i < this->pop_size + this->num_objs; ++i){
-		for(unsigned int j = i+1; j < this->pop_size + this->num_objs; ++j){
-			double radius_1 = i >= this->pop_size ? this->objectives[i-this->pop_size]->radius : this->entities[i].radius;
-			double radius_2 = j >= this->pop_size ? this->objectives[j-this->pop_size]->radius : this->entities[j].radius;
-			if(g_if_collision(i, j, false, false, radius_1, radius_2)){
-				g_bm[i] = 1;
-				g_bm[j] = 1;
+	double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
+	double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
+	char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
+
+	dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
+	dim3 threadsPerBlock(16, 1, 1);
+
+	// between entities
+	collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, this->entities[0].radius, res, d_position_x, d_position_y, d_bm);
+	
+	// between entities and objects
+	collision_diff_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, this->num_objs, this->entities[0].radius, this->objectives[0]->radius, res, d_position_x, d_position_y, d_bm);
+	
+	// between objects
+	for(unsigned int i = 0; i < this->num_objs; ++i){
+		for(unsigned int j = i+1; j < this->num_objs; ++j){
+			double radius = this->objectives[0]->radius;
+			if(g_if_collision(this->pop_size+i, this->pop_size+j, false, false, radius, radius)){
+				g_bm[this->pop_size+i] = 1;
+				g_bm[this->pop_size+j] = 1;
 				res = true;
 			}
 		}
 	}
+
 #else
 	// between entities
 	for(unsigned int i = 0; i < this->pop_size; ++i){
@@ -697,6 +794,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->dim = dimension;
 	this->dim_limit = limit;
 
+#ifdef GPU
 	this->position_x = thrust::device_vector<double>(size+num_objectives, 0);
 	this->position_y = thrust::device_vector<double>(size+num_objectives, 0);
 	this->position_next_x = thrust::device_vector<double>(size, 0);
@@ -704,8 +802,6 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->velocity_x = thrust::device_vector<double>(size, 0);
 	this->velocity_y = thrust::device_vector<double>(size, 0);
 	this->g_bm = thrust::device_vector<char>(size+num_objectives, 0);
-
-#ifdef GPU
 #if 0
 	gpu_uni_malloc((void **) &g_pos_x, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_y, (size+num_objectives) * sizeof(double));

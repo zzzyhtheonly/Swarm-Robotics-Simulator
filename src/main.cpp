@@ -209,6 +209,8 @@ void render_function()
 	cout << test.position_x[test.pop_size] << endl;
 	cout << test.position_next_x[test.pop_size-2] << endl;
 	cout << (int)test.g_bm[test.pop_size-2] << endl;
+	double video_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
+	cout << video_time << endl;
 	return;
 #endif
   

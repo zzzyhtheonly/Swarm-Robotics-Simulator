@@ -34,6 +34,9 @@ class objective;
 class individual;
 class population;
 
+extern double radius;
+extern double objective_radius;
+
 /* define a one bit data structure for bitmap */
 typedef struct one_bit
 {
