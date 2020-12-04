@@ -1,38 +1,13 @@
 #include <vector>
-#include <list>
-#include <iostream>
-#include <iomanip>
-#include <cstdlib>
-#include <fstream>
-
-#ifdef GPU
-#include <cuda.h>
-#include <cuda_runtime_api.h>
-#include <thrust/device_vector.h>
-#endif
 
 #define RANDOM_INIT 0
 #define LEFTMOST_INIT 1
 
 using namespace::std;
 
-/* refine every GPU-friendly variables as global pointers for GPU version*/
-#ifdef GPU
-/* should be pop_size + num_objs, could be found in class population, only support 2 dimension at the moment */
-extern double *g_pos_x;
-extern double *g_pos_y;
-/* should be pop_size */
-extern double *g_pos_next_x;
-extern double *g_pos_next_y;
-/* should be pop_size + num_objs, could be found in class population */
-extern char *g_bm;
-extern ofstream log_file;
-#endif
-
 class drawable;
 class objective;
 class individual;
-class population;
 
 /* define a one bit data structure for bitmap */
 typedef struct one_bit
@@ -83,9 +58,6 @@ public:
 class drawable
 {
 public:
-	/* unqiue id for each entity */
-	unsigned int id;
-
 	/* dimension of our space, fixed to 2 at this moment */
 	unsigned int dimension;
 
@@ -103,22 +75,24 @@ public:
 
 	/* construct functions */
 	drawable() = delete;
-	drawable(unsigned int dimension, double radius, double limit, unsigned int id, population& p);
+	drawable(unsigned int dimension, double radius, double limit);
 
 	/* draw circle */
-	void draw(double r, double g, double b);
+	void draw();
 };
 
 /* Used to differentiate objectives from other drawables
    Can expand this later */
 class objective : public drawable {
 public:
+	unsigned int id = -1;
+
 	/* collision detection between objectives, only could happen after initialization */
 	bool if_collision(objective *another);
 
 	/* construct functions */
 	objective() = delete;
-	objective(unsigned int dimension, double radius, double limit, unsigned int id, population& p);
+	objective(unsigned int dimension, double radius, double limit, unsigned int id);
 
 };
 
@@ -126,7 +100,6 @@ public:
 class individual : public drawable
 {
 public:
-	unsigned int id = -1;
 	/* current status */
 	states status;
 
@@ -141,7 +114,7 @@ public:
 
 	/* construct functions */
 	individual() = delete;
-	individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id, population& p);
+	individual(unsigned int dimension, double radius, double limit, unsigned int mode);
 
 	/* no checks move, return true if there is collisions with walls */
 	bool _move(vector<double>&);
@@ -160,8 +133,6 @@ public:
 	bool if_sense(individual another, double sense_dist);
 	bool if_sense(objective *another, double sense_dist);
 
-	void grid_coordinates(unsigned int &x, unsigned int &y, double limit, double cell);
-
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
 };
@@ -170,22 +141,6 @@ public:
 class population
 {
 public:
-
-#ifdef GPU
-    thrust::device_vector<double> position_x;
-    thrust::device_vector<double> position_y;
-	thrust::device_vector<double> position_next_x;
-    thrust::device_vector<double> position_next_y;
-    thrust::device_vector<double> velocity_x;
-    thrust::device_vector<double> velocity_y; 
-    thrust::device_vector<int> status;
-	thrust::device_vector<char> g_bm;
-	
-	void birth_robot();       // pushes back one more robot data to the device_vectors
-    void advance_robot();    // launches the move that adds velocity to positions
-	bool g_if_collision(unsigned int, unsigned int, bool, bool, double, double);
-#endif
-
 	/* population size */
 	unsigned int pop_size;
 
@@ -197,18 +152,12 @@ public:
 
 	/* Dimension of simulation */
 	unsigned int dim;
-	double dim_limit;
 
 	/* objectives for population, represented by drawables */
 	vector<objective *> objectives;
 
 	/* bitmap of all entities, 1 means collison detected */
 	vector<one_bit> bm; 
-
-	/* Grid for detecting collisions */
-	vector<unsigned int> **grid;
-	unsigned int cell_size;
-	unsigned int grid_size;
 
 	/* construct functions */
 	population() = delete;
@@ -238,10 +187,6 @@ public:
 	bool terminate();
 
 	void form_path(individual *linked1, individual *linked2, individual *finder);
-
-	void init_grid(double radius, double dimension_limit);
-	void clear_grid();
-	void assign_to_grid();
 	
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
