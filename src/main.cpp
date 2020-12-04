@@ -2,9 +2,17 @@
 #include <GL/gl.h>
 #include <iostream>
 #include <unistd.h>
-#include <time.h> 
+#include <time.h>
+#include <math.h> 
 
 #include "headers.h"
+
+const string GRD_DIM_STR = "Ground_Dim:";
+const string NUM_ENT_STR = "Num_Entities:";
+const string RAD_STR = "Radius:";
+const string NUM_OBJ_STR = "Num_Objectives:";
+const string OBJ_RAD_STR = "Objective_Radius:";
+const string CLR_STR = "CLEAR";
 
 /* arguments */
 unsigned int mode = 0;
@@ -70,31 +78,80 @@ void clear_screen()
 }
 
 vector<string> tokenize(string line) {
-	cout << "Tokenizing: " << line << endl;
         vector<string> words;
         int i = 0;
         int j = 0;
         while (i < line.size()) {
                 if (line[i] == '\t' || i == line.size()-1) {
-                        words.push_back(line.substr(j, i-j));
+                        words.push_back(line.substr(j, i-j+(i==line.size()-1)));
                         j = i+1;
                 }
                 i++;
         }
-	cout << "Found " << words.size() << " words" << endl;
         return words;
 }
 
+void parse_global_params(vector<string> words) {
+	if (words[0] == GRD_DIM_STR) {
+		ground_dimension = stod(words[1]);
+		std::cout << GRD_DIM_STR << " " << ground_dimension << std::endl;
+	} else if (words[0] == NUM_ENT_STR) {
+		population_size = stoi(words[1]);
+		std::cout << NUM_ENT_STR << " " << population_size << std::endl;
+	} else if (words[0] == RAD_STR) {
+		radius = stod(words[1]);
+		std::cout << RAD_STR << " " << radius << std::endl;
+	} else if (words[0] == NUM_OBJ_STR) {
+		number_objectives = stoi(words[1]);
+		std::cout << NUM_OBJ_STR << " " << number_objectives << std::endl;
+	} else if (words[0] == OBJ_RAD_STR) {
+		objective_radius = stod(words[1]);
+		std::cout << OBJ_RAD_STR << " " << objective_radius << std::endl;
+	}
+}
+
+void draw_circle(bool isObj, double x, double y){
+	unsigned int count = 20;
+        GLfloat twicePi = 2.0f * M_PI;
+	double r = radius;
+	if (isObj) r = objective_radius;
+
+	glBegin(GL_TRIANGLE_FAN);
+		glVertex2f(x, y);
+
+                for(unsigned int i = 0; i <= count; ++i) {
+                        glVertex2f(x + (r * cos(i * twicePi / count)), y + (r * sin(i * twicePi / count)));
+                }
+	glEnd();
+}
 
 void render_log()
 {
 	ifstream log_in("log2.txt");
 	string line;
 	vector<string> words;
+	double x,y,r,g,b;
+	int id;
+
+	for (int i = 0; i < 5; i++) {
+		getline(log_in, line);
+		parse_global_params(tokenize(line));
+	}
+
 	while(getline(log_in, line)) {
 		words = tokenize(line);
-		for (int i = 0; i < words.size(); i++) {
-			cout << words[i] << endl;
+		if (words[0] == CLR_STR) {
+			glFlush();
+			clear_screen();
+		} else {
+			id = stoi(words[0]);
+			x = stod(words[1]);
+			y = stod(words[2]);
+			r = stod(words[3]);
+			g = stod(words[4]);
+			b = stod(words[5]);
+			glColor3f(r,g,b);
+			draw_circle((id>=population_size), x,y);
 		}
 	}
 	return;
@@ -243,7 +300,7 @@ void render_function()
 
 		glFlush();
 		clear_screen();
-		log_file << "CLEAR" << std::endl;
+		log_file << CLR_STR << std::endl;
 	}
 
 	glFlush();
@@ -308,11 +365,11 @@ int main(int argc, char* argv[])
 	if (optind < argc){
 		max_time = atoi(argv[optind++]);
 	}
-	log_file << "Ground_Dim:\t" << std::to_string(ground_dimension) << std::endl
-		<< "Num_Entites:\t" << std::to_string(population_size) << std::endl
-		<< "Radius:\t" << std::to_string(radius) << std::endl
-		<< "NUM_Obj:\t" << std::to_string(number_objectives) << std::endl
-		<< "Objective_Rad:\t" << std::to_string(radius) << std::endl;
+	log_file << GRD_DIM_STR << "\t" << std::to_string(ground_dimension) << std::endl
+		<< NUM_ENT_STR << "\t" << std::to_string(population_size) << std::endl
+		<< RAD_STR << "\t" << std::to_string(radius) << std::endl
+		<< NUM_OBJ_STR << "\t" << std::to_string(number_objectives) << std::endl
+		<< OBJ_RAD_STR << "\t" << std::to_string(radius) << std::endl;
 
 #ifdef GPU
 	render_function();
