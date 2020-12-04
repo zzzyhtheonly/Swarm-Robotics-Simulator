@@ -91,8 +91,8 @@ void drawable::draw(double r, double g, double b)
 
 		/* center */
 #ifdef GPU
-		//log_file << this->id << "\t" << g_pos_x[this->id] << "\t" << g_pos_y[this->id] 
-			//<< "\t" << r << "\t" << g << "\t" << b << "\t" << std::endl;
+		log_file << this->id << "\t" << g_pos_x[this->id] << "\t" << g_pos_y[this->id] 
+			<< "\t" << r << "\t" << g << "\t" << b << "\t" << std::endl;
 		/*
 		glVertex2f(g_pos_x[this->id], g_pos_y[this->id]);
 		for(unsigned int i = 0; i <= count; ++i) {
