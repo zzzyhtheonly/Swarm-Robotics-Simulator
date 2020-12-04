@@ -174,7 +174,7 @@ public:
     thrust::device_vector<double> position_next_y;
     thrust::device_vector<double> velocity_x;
     thrust::device_vector<double> velocity_y; 
-    thrust::device_vector<int> status;
+    thrust::device_vector<int> g_status;
 	thrust::device_vector<char> g_bm;
 	double limit;
 	

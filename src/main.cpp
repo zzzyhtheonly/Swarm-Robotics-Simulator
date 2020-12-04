@@ -159,11 +159,13 @@ void render_function()
 		
 		/* TODO: GPU version */
 		check = clock();
-		for(unsigned int i = 0; i < test.pop_size; ++i){
-			test.entities[i].move();
-		}
+		
 		#ifdef GPU
 			test.advance_robot();
+        #else
+            for(unsigned int i = 0; i < test.pop_size; ++i){
+                test.entities[i].move();
+            }
 		#endif
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 

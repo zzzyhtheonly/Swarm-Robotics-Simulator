@@ -27,11 +27,30 @@ __global__ void move_kernel(double *position_x, double *position_y, double *posi
 {
     unsigned int index = blockDim.x * blockIdx.x + threadIdx.x;
     if (index >= pop_size) return;
-    g_move(index, position_x, position_y, position_next_x, position_next_y, velocity_x, velocity_y, status, limit);
-    // position_x[index] += velocity_x[index];
-    // position_y[index] += velocity_y[index];
-    printf("%d, %f %f\n", index, position_x[index], position_y[index]);
-    // positions[index] = index; // use this one for debugging the index
+    if(status[index] == 1){
+	    status[index] = 2;
+	    return;
+	  }
+
+	  if(status[index] == 2){
+	    status[index] = 3;
+	  }
+
+	  double tmp = position_x[index] + velocity_x[index];
+	  if(tmp > limit || tmp < -limit){
+	        velocity_x[index] = -velocity_x[index];
+	  }
+	  tmp = position_y[index] + velocity_y[index];
+	  if(tmp > limit || tmp < -limit){
+	        velocity_y[index] = -velocity_y[index];
+	  }
+	  position_x[index] += velocity_x[index];
+	  position_y[index] += velocity_y[index];
+	  
+	  /* update pos_next after real movement */
+	  position_next_x[index] = position_x[index];
+	  position_next_y[index] = position_y[index];
+    // printf("%d, %f %f\n", index, position_x[index], position_y[index]);
 }
 #endif
 
@@ -700,7 +719,7 @@ void population::birth_robot()
 
   velocity_x.push_back(1.0);
   velocity_y.push_back(1.0);
-  status.push_back(2);
+  g_status.push_back(2);
 }
 
 void population::advance_robot()
@@ -715,7 +734,7 @@ void population::advance_robot()
   double* d_position_next_y = thrust::raw_pointer_cast(&position_next_y[0]);
   double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
   double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
-  int* d_status = thrust::raw_pointer_cast(&status[0]);
+  int* d_g_status = thrust::raw_pointer_cast(&g_status[0]);
 
 
   dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
@@ -723,7 +742,7 @@ void population::advance_robot()
 
 
   move_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_position_next_x,
-   d_position_next_y, d_velocity_x, d_velocity_y, d_status, pop_size, this->limit);
+   d_position_next_y, d_velocity_x, d_velocity_y, d_g_status, pop_size, this->limit);
   cudaDeviceSynchronize();
 }
 
