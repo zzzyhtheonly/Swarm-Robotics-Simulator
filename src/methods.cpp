@@ -50,7 +50,7 @@ __global__ void move_kernel(double *position_x, double *position_y, double *posi
 	  /* update pos_next after real movement */
 	  position_next_x[index] = position_x[index];
 	  position_next_y[index] = position_y[index];
-    // printf("%d, %f %f\n", index, position_x[index], position_y[index]);
+     // printf("%d, %f %f\n", index, position_x[index], position_y[index]);
 }
 #endif
 
@@ -638,6 +638,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->position_next_y = thrust::device_vector<double>(size, 0);
 	this->velocity_x = thrust::device_vector<double>(size, 0);
 	this->velocity_y = thrust::device_vector<double>(size, 0);
+	this->g_status = thrust::device_vector<double>(size, 2);
 	this->g_bm = thrust::device_vector<char>(size+num_objectives, 0);
 	this->limit = limit;
 #if 0
@@ -744,6 +745,18 @@ void population::advance_robot()
   move_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_position_next_x,
    d_position_next_y, d_velocity_x, d_velocity_y, d_g_status, pop_size, this->limit);
   cudaDeviceSynchronize();
+
+  for (unsigned int i = 0; i < this->pop_size; ++i){
+  	this->entities[i].pos[0] = position_x[i];
+  	this->entities[i].pos[1] = position_y[i];
+  	this->entities[i].pos_next[0] = position_next_x[i];
+  	this->entities[i].pos_next[1] = position_next_y[i];
+  	this->entities[i].velocity[0] = velocity_x[i];
+  	this->entities[i].velocity[1] = velocity_y[i];
+  	if (g_status[i] == 1) {this->entities[i].status = STOP;}
+  	else if (g_status[i] == 2) {this->entities[i].status = READY;}
+  	else if (g_status[i] == 3) {this->entities[i].status = RUNNING;}
+  }
 }
 
 __device__ __host__ void print_pos(double* position_x, double* position_y, int i){
