@@ -138,13 +138,11 @@ void individual::move()
 	if(this->status == STOP){
 		this->status = READY;
 		return;
-	}
-
-	if(this->status == READY){
+	} else if(this->status == READY){
 		this->status = RUNNING;
+	} else {
+		_move(this->pos);
 	}
-
-	_move(this->pos);
 	
 	/* update pos_next after real movement */
 	for(unsigned int i = 0; i < this->dimension; ++i){
@@ -194,7 +192,6 @@ bool individual::if_collision(individual another)
 
 	distance = sqrt(distance);
 	//cout << distance << endl;
-
 	return distance < this->radius + another.radius ? true : false;
 }
 
@@ -494,14 +491,20 @@ void population::adjustment()
 				this->entities[i].move_prediction();
 			}
 		}
+		//cout << "HERE" << endl;
+		retries++;
 	}
 	/* collision still exists, stop the entities detected collision */
-	while(collision()){
+	while (collision()){
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < this->pop_size; ++i){
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
-				this->entities[i].status = STOP;
+				if (this->entities[i].status != LINK ||
+					this->entities[i].status != PATH ||
+					this->entities[i].status != ON_OBJ) {
+					this->entities[i].status = STOP;
+				}
 				/* reset pos_next */
 				for(unsigned int j = 0; j < this->entities[i].dimension; ++j){
 					this->entities[i].pos_next[j] = this->entities[i].pos[j];
@@ -591,6 +594,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	for(unsigned int i = 0; i < size; ++i){
 		this->entities.push_back(individual(dimension, radius, limit, mode, i));
 		this->bm.push_back(one_bit());
+		//this->entities[i].move_prediction();
 	}
 
 	for(unsigned int i = 0; i < num_objectives; ++i) {
@@ -621,6 +625,8 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 				this->objectives[i] = new objective(dimension, objective_radius, limit, i);
 			}
 		}
+		this->clear_grid();
+		this->assign_to_grid();
 	}
 
 	if(retries == 100){
@@ -633,6 +639,6 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	}
 
 	//this->init_grid(radius, limit);
-	this->clear_grid();
-	this->assign_to_grid();
+	//this->clear_grid();
+	//this->assign_to_grid();
 }

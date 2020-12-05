@@ -170,6 +170,9 @@ void log_simulation()
 	double grid_time = 0;
 	clock_t start = clock();
 	clock_t last_update = start;
+	/* Variables for giving status in terminal */
+	double last_status = 0.;
+	double status_freq = max_time / 10.;
 
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
@@ -335,6 +338,9 @@ void log_simulation()
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
 			log_file.close();
 			exit(0);
+		} else if (total_time >= last_status + status_freq) {
+			std::cout << total_time << "s has passed" << std::endl;
+			last_status = total_time;
 		}
 
 		//glFlush();
