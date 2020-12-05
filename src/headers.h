@@ -1,10 +1,15 @@
 #include <vector>
 #include <list>
+#include <iomanip>
+#include <cstdlib>
+#include <fstream>
 
 #define RANDOM_INIT 0
 #define LEFTMOST_INIT 1
 
 using namespace::std;
+
+extern ofstream log_file;
 
 class drawable;
 class objective;
@@ -59,6 +64,8 @@ public:
 class drawable
 {
 public:
+	unsigned int id;
+
 	/* dimension of our space, fixed to 2 at this moment */
 	unsigned int dimension;
 
@@ -76,17 +83,16 @@ public:
 
 	/* construct functions */
 	drawable() = delete;
-	drawable(unsigned int dimension, double radius, double limit);
+	drawable(unsigned int dimension, double radius, double limit, unsigned int id);
 
 	/* draw circle */
-	void draw();
+	void draw(double r, double g, double b);
 };
 
 /* Used to differentiate objectives from other drawables
    Can expand this later */
 class objective : public drawable {
 public:
-	unsigned int id = -1;
 
 	/* collision detection between objectives, only could happen after initialization */
 	bool if_collision(objective *another);
@@ -101,7 +107,6 @@ public:
 class individual : public drawable
 {
 public:
-	unsigned int id = -1;
 	/* current status */
 	states status;
 

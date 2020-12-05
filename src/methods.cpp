@@ -1,6 +1,3 @@
-#include <GL/gl.h>
-#include <GL/freeglut.h>
-#include <math.h>
 #include <bits/stdc++.h>
 #include <algorithm>
 #include "headers.h"
@@ -26,12 +23,13 @@ linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
 }
 
 /** Parent class for things that need to be displayed on screen **/
-drawable::drawable(unsigned int dimension, double radius, double limit)
+drawable::drawable(unsigned int dimension, double radius, double limit, unsigned int id)
 {
 	this->dimension = dimension;
 	this->limit = limit;
 	this->pos = vector<double>(dimension, 0);
 	this->radius = radius;
+	this->id = id;
 
 	/* initialize coordinates randomly */
 	random_device dev;
@@ -46,23 +44,26 @@ drawable::drawable(unsigned int dimension, double radius, double limit)
 }
 
 /* draw itself in OpenGL by filling with tiny triangles */
-void drawable::draw()
+void drawable::draw(double r, double g, double b)
 {
+	log_file << this->id << "\t" << this->pos[0] << "\t" << this->pos[1]
+		<< "\t" << r << "\t" << g << "\t" << b << std::endl;
+	/*
 	unsigned int count = 20;
 	GLfloat twicePi = 2.0f * M_PI;
 
 	glBegin(GL_TRIANGLE_FAN);
 
-		/* center */
+		// center
 		glVertex2f(pos[0], pos[1]);
 
 		for(unsigned int i = 0; i <= count; ++i) {
 			glVertex2f(pos[0] + (radius * cos(i * twicePi / count)), pos[1] + (radius * sin(i * twicePi / count)));
 		}
-	glEnd();
+	glEnd(); */
 }
 
-objective::objective(unsigned int dimension, double radius, double limit, unsigned int id) : drawable(dimension, radius, limit) {
+objective::objective(unsigned int dimension, double radius, double limit, unsigned int id) : drawable(dimension, radius, limit, id) {
 	/* Set my id */
 	this->id = id;	
 	/* Establish root of linked tree */
@@ -74,7 +75,7 @@ objective::objective(unsigned int dimension, double radius, double limit, unsign
  * radius: fix to 20 at the moment
  * limit: playground dimension limit, only square allowed, assume that you want a 1000*1000 square then limit should be 1000
  */
-individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id) : drawable(dimension, radius, limit)
+individual::individual(unsigned int dimension, double radius, double limit, unsigned int mode, unsigned int id) : drawable(dimension, radius, limit, id)
 {
 	this->dimension = dimension;
 	this->limit = limit;
@@ -398,8 +399,6 @@ bool population::collision()
 	double c = this->cell_size;
 	double r = this->entities[0].radius*2;
 
-	/* TODO: make it supports GPU */
-
 	// Loop through each entity
 	for(unsigned int i = 0; i < this->pop_size; ++i){
 		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
@@ -434,8 +433,6 @@ bool population::collision()
 bool population::init_collision()
 {
 	bool res = false;
-	
-	/* TODO: make it supports GPU */
 	// between entities
 	for(unsigned int i = 0; i < this->pop_size; ++i){
 		for(unsigned int j = i+1; j < this->pop_size; ++j){
