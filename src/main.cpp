@@ -128,8 +128,10 @@ void render_log_function() {
                         draw_circle((id>=population_size), x,y);
                 }
         }
-	while (true)
+	while (true) {
+		glutPostRedisplay();
 		sleep(100);
+	}
         return;
 }
 
