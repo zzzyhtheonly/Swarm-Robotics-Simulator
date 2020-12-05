@@ -2,6 +2,7 @@
 #include <GL/gl.h>
 #include <iostream>
 #include <unistd.h>
+
 #include <time.h>
 #include <math.h> 
 
@@ -30,6 +31,7 @@ unsigned int dimension_size = 2;
 #ifdef GPU
 ofstream log_file("log.txt");
 #endif
+
 ifstream log_in("log2.txt");
 
 __global__
@@ -40,6 +42,7 @@ void device_print_something(unsigned int pop_size, double* pos_x, double* pos_y,
 	
 	printf("%f %f\n", pos_x[i], pos_y[i]);
 }
+
 
 // Source: http://www.david-amador.com/2012/09/how-to-take-screenshot-in-opengl/
 bool save_screenshot(string filename, int w, int h)
@@ -203,15 +206,18 @@ void render_function()
 	double adjustment_time = 0;
 	double move_time = 0;
 	double draw_lines_time = 0;
+
 	double grid_time = 0;
 	double video_time = 0;
 	clock_t start = clock();
 	clock_t last_video = clock();
 	unsigned int video_ctr = 0;
 
+
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
+
   
 #ifdef GPU
 	cout << "end of gpu version" << endl;
@@ -289,10 +295,14 @@ void render_function()
 		
 		/* TODO: GPU version */
 		check = clock();
-		for(unsigned int i = 0; i < test.pop_size; ++i){
-			test.entities[i].move();
-			//if (i == 0) cout << test.entities[i].pos[0] << " - " << test.entities[i].pos[1] << endl;
-		}
+		
+		#ifdef GPU
+		test.advance_robot();
+        #else
+        for(unsigned int i = 0; i < test.pop_size; ++i){
+                test.entities[i].move();
+            }
+		#endif
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		check = clock();
@@ -344,6 +354,7 @@ void render_function()
 			printf("\tRendering video: %.2f%%\n", (video_time/total_time)*100.);
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
 			std::cout << "\nNumber of updates: " << timestamp-1 << std::endl;
+
 			save_screenshot("out.tga", 500, 500);
 #ifdef GPU
 			log_file.close();

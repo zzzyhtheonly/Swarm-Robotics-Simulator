@@ -2,7 +2,9 @@
 #include <GL/freeglut.h>
 #include <math.h>
 #include <bits/stdc++.h>
+
 #include <algorithm>
+
 #include <string>
 #include "headers.h"
 
@@ -18,19 +20,40 @@ char *g_bm = nullptr;
 __device__ __host__ void print_pos(double*, double*, int);
 
 
-__device__ __host__ void g_move(unsigned int, double *, double *, double * , double *, int *, double);
+__device__ __host__ void g_move(unsigned int, double *, double *, double *, 
+							double *, double * , double *, int *, double );
 __device__ __host__ bool _g_move(unsigned int , double *, double *, double *, double *, double );
 
 // This is the move that is launched from CPU and GPU runs it for each cell
-__global__ void move_kernel(double *position_x, double *position_y, double *velocity_x, double *velocity_y, int *status, int pop_size)
+__global__ void move_kernel(double *position_x, double *position_y, double *position_next_x, 
+	double *position_next_y, double *velocity_x, double *velocity_y, int *status, int pop_size, double limit)
 {
     unsigned int index = blockDim.x * blockIdx.x + threadIdx.x;
     if (index >= pop_size) return;
-    g_move(index, position_x, position_y, velocity_x, velocity_y, status, 1000.0);
-    // position_x[index] += velocity_x[index];
-    // position_y[index] += velocity_y[index];
-    printf("%d, %f %f\n", index, position_x[index], position_y[index]);
-    // positions[index] = index; // use this one for debugging the index
+    if(status[index] == 1){
+	    status[index] = 2;
+	    return;
+	  }
+
+	  if(status[index] == 2){
+	    status[index] = 3;
+	  }
+
+	  double tmp = position_x[index] + velocity_x[index];
+	  if(tmp > limit || tmp < -limit){
+	        velocity_x[index] = -velocity_x[index];
+	  }
+	  tmp = position_y[index] + velocity_y[index];
+	  if(tmp > limit || tmp < -limit){
+	        velocity_y[index] = -velocity_y[index];
+	  }
+	  position_x[index] += velocity_x[index];
+	  position_y[index] += velocity_y[index];
+	  
+	  /* update pos_next after real movement */
+	  position_next_x[index] = position_x[index];
+	  position_next_y[index] = position_y[index];
+     // printf("%d, %f %f\n", index, position_x[index], position_y[index]);
 }
 #endif
 
@@ -134,6 +157,7 @@ individual::individual(unsigned int dimension, double radius, double limit, unsi
 	this->status = READY;
 	this->mode = mode;
 	this->id = id;
+
 
 	/* initialize coordinates and velocities randomly */
 	random_device dev;
@@ -297,7 +321,6 @@ bool individual::if_collision(individual another)
 	}
 
 	distance = sqrt(distance);
-	//cout << distance << endl;
 
 	return distance < this->radius + another.radius ? true : false;
 }
@@ -372,7 +395,6 @@ void population::sense_objectives(double sense_dist)
 within a path) within sensing distance of at least one other linked entity? */
 void population::sense_entities(double sense_dist)
 {	
-
 	unsigned int left_x, right_x, up_y, down_y;
 	double l = this->dim_limit;
 	double c = this->cell_size;
@@ -383,10 +405,12 @@ void population::sense_entities(double sense_dist)
 	// Loop through each entity
 	for(unsigned int i = 0; i < this->pop_size; ++i){
 		/* Continue to next entity if in tree */
+
 		if (this->entities[i].status == ON_OBJ ||
 			this->entities[i].status == LINK ||
 			this->entities[i].status == PATH)
 			continue;
+
 		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
 		left_x = max(0, (int)(((this->entities[i].pos[0]+l)-s)/c));
 		right_x = min((int)this->grid_size-1, (int)(((this->entities[i].pos[0]+l)+s)/c));
@@ -605,7 +629,6 @@ bool population::collision()
 			}
 		}
 	}
-#endif
 
 	return res;
 }
@@ -616,6 +639,7 @@ bool population::init_collision()
 	bool res = false;
 	
 #ifdef GPU
+
 	double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
 	double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
 	char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
@@ -639,17 +663,6 @@ bool population::init_collision()
 
 	// between entities and objects
 	collision_diff_kernel<<<blocksPerGrid,threadsPerBlock, 0, streams[1]>>>(this->pop_size, this->num_objs, this->entities[0].radius, this->objectives[0]->radius, d_res, d_position_x, d_position_y, d_bm);
-	
-	// between objects
-	for(unsigned int i = 0; i < this->num_objs; ++i){
-		for(unsigned int j = i+1; j < this->num_objs; ++j){
-			if(this->objectives[i]->if_collision(this->objectives[j])){
-				this->bm[this->pop_size+i].bit = 1;
-				this->bm[this->pop_size+j].bit = 1;
-				res = true;
-			}
-		}
-	}
 	
 	cudaDeviceSynchronize();
 	
@@ -678,6 +691,17 @@ bool population::init_collision()
 		}
 	}
 #endif
+
+	// between objects
+	for(unsigned int i = 0; i < this->num_objs; ++i){
+		for(unsigned int j = i+1; j < this->num_objs; ++j){
+			if(this->objectives[i]->if_collision(this->objectives[j])){
+				this->bm[this->pop_size+i].bit = 1;
+				this->bm[this->pop_size+j].bit = 1;
+				res = true;
+			}
+		}
+	}
 
 	return res;
 	
@@ -739,7 +763,9 @@ bool population::terminate()
 }
 
 void population::form_path(individual *linked1, individual *linked2, individual *finder) {
+
 	//linked_tree *prev;
+
 	linked_tree *tmp = linked1->link;
 	while (tmp->node != tmp->root) {
 		((individual *)tmp->node)->status = PATH;
@@ -788,6 +814,7 @@ void population::assign_to_grid() {
 	}
 }
 
+
 #ifdef GPU
 void gpu_uni_malloc(void **buf, size_t size)
 {
@@ -810,6 +837,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->dim = dimension;
 	this->dim_limit = limit;
 
+
 #ifdef GPU
 	this->position_x = thrust::device_vector<double>(size+num_objectives, 0);
 	this->position_y = thrust::device_vector<double>(size+num_objectives, 0);
@@ -817,7 +845,11 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->position_next_y = thrust::device_vector<double>(size, 0);
 	this->velocity_x = thrust::device_vector<double>(size, 0);
 	this->velocity_y = thrust::device_vector<double>(size, 0);
+
+	this->g_status = thrust::device_vector<double>(size, 2);
 	this->g_bm = thrust::device_vector<char>(size+num_objectives, 0);
+	this->limit = limit;
+
 #if 0
 	gpu_uni_malloc((void **) &g_pos_x, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_y, (size+num_objectives) * sizeof(double));
@@ -887,6 +919,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->init_grid(radius, limit);
 	this->clear_grid();
 	this->assign_to_grid();
+
 }
 
 
@@ -901,7 +934,8 @@ void population::birth_robot()
 
   velocity_x.push_back(1.0);
   velocity_y.push_back(1.0);
-  status.push_back(2);
+
+  g_status.push_back(2);
 }
 
 void population::advance_robot()
@@ -910,30 +944,36 @@ void population::advance_robot()
   // the end of the day a GPU structure abstraction in CPU) we have to get the
   // pointer in GPU memory in order for the move to know where to start 
   // reading the double arrays from.
-  double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
-  double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
+
+  double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
+  double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
+  double* d_position_next_x = thrust::raw_pointer_cast(&position_next_x[0]);
+  double* d_position_next_y = thrust::raw_pointer_cast(&position_next_y[0]);
   double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
   double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
-  int* d_status = thrust::raw_pointer_cast(&status[0]);
-  /* This is the way I structured my blocks and threads. I fixed the amount of
-   * threads per block to 1024. So to get the amount of blocks we just get the
-   * total number of elements in positions and divide it by 1024. We add one in
-   * case the division leaves remainder.
-   *
-   * ┌──────────────────────grid─┬of─blocks─────────────────┬──────────
-   * │     block_of_threads      │     block_of_threads     │  
-   * │ ┌───┬───┬───────┬──────┐  │ ┌───┬───┬───────┬──────┐ │
-   * │ │ 0 │ 1 │ [...] │ 16   │  │ │ 0 │ 1 │ [...] │ 16   │ │   ...
-   * │ └───┴───┴───────┴──────┘  │ └───┴───┴───────┴──────┘ │
-   * └───────────────────────────┴──────────────────────────┴──────────
-   */
-
-  dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
-  dim3 threadsPerBlock(16, 1, 1);
+  int* d_g_status = thrust::raw_pointer_cast(&g_status[0]);
 
 
-  move_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_velocity_x, d_velocity_y, d_status, pop_size);
+  dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+  dim3 threadsPerBlock(10, 1, 1);
+
+
+  move_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_position_next_x,
+   d_position_next_y, d_velocity_x, d_velocity_y, d_g_status, pop_size, this->limit);
   cudaDeviceSynchronize();
+
+  for (unsigned int i = 0; i < this->pop_size; ++i){
+  	this->entities[i].pos[0] = position_x[i];
+  	this->entities[i].pos[1] = position_y[i];
+  	this->entities[i].pos_next[0] = position_next_x[i];
+  	this->entities[i].pos_next[1] = position_next_y[i];
+  	this->entities[i].velocity[0] = velocity_x[i];
+  	this->entities[i].velocity[1] = velocity_y[i];
+  	if (g_status[i] == 1) {this->entities[i].status = STOP;}
+  	else if (g_status[i] == 2) {this->entities[i].status = READY;}
+  	else if (g_status[i] == 3) {this->entities[i].status = RUNNING;}
+  }
+
 }
 
 __device__ __host__ void print_pos(double* position_x, double* position_y, int i){
@@ -965,8 +1005,8 @@ bool _g_move(unsigned int index, double *position_x, double *position_y,
 
 /* movement with respect to veclocity */
 __device__ __host__ 
-void g_move(unsigned int index, double *position_x, double *position_y, 
-  double * velocity_x, double *velocity_y, int *status, double limit)
+void g_move(unsigned int index, double *position_x, double *position_y, double *position_next_x, 
+	double *position_next_y, double * velocity_x, double *velocity_y, int *status, double limit)
 {
   if(status[index] == 1){
     status[index] = 2;
@@ -977,11 +1017,19 @@ void g_move(unsigned int index, double *position_x, double *position_y,
     status[index] = 3;
   }
 
-  _g_move(index, position_x, position_y, velocity_x, velocity_y, limit);
+  double tmp = position_x[index] + velocity_x[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_x[index] = -velocity_x[index];
+  }
+  tmp = position_y[index] + velocity_y[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_y[index] = -velocity_y[index];
+  }
+  position_x[index] += velocity_x[index];
+  position_y[index] += velocity_y[index];
   
   /* update pos_next after real movement */
-  // for(unsigned int i = 0; i < this->dimension; ++i){
-  //   this->pos_next[i] = this->pos[i];
-  // }
+  position_next_x[index] = position_x[index];
+  position_next_y[index] = position_y[index];
 }
 #endif
