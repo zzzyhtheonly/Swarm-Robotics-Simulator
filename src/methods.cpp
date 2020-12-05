@@ -543,6 +543,7 @@ void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double 
 		}
 	}
 }
+#endif
 
 bool population::collision()
 {
