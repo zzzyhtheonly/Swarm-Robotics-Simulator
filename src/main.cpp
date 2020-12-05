@@ -32,6 +32,15 @@ ofstream log_file("log.txt");
 #endif
 ifstream log_in("log2.txt");
 
+__global__
+void device_print_something(unsigned int pop_size, double* pos_x, double* pos_y, char* bm)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size) return;
+	
+	printf("%f %f\n", pos_x[i], pos_y[i]);
+}
+
 // Source: http://www.david-amador.com/2012/09/how-to-take-screenshot-in-opengl/
 bool save_screenshot(string filename, int w, int h)
 {	
@@ -206,10 +215,16 @@ void render_function()
   
 #ifdef GPU
 	cout << "end of gpu version" << endl;
-	cout << test.position_x[test.pop_size] << endl;
-	cout << test.position_next_x[test.pop_size-2] << endl;
-	cout << (int)test.g_bm[test.pop_size-2] << endl;
 	video_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
+	
+#if 0
+	dim3 blocksPerGrid(ceil((population_size)/16.0), 1, 1);
+	dim3 threadsPerBlock(16, 1, 1);
+	double* d_position_x =  thrust::raw_pointer_cast(&test.position_x[0]);
+	double* d_position_y =  thrust::raw_pointer_cast(&test.position_y[0]);
+	char* d_bm =  thrust::raw_pointer_cast(&test.g_bm[0]);
+	device_print_something<<<blocksPerGrid,threadsPerBlock>>>(population_size, d_position_x, d_position_y, d_bm);
+#endif
 	cout << video_time << endl;
 	return;
 #endif

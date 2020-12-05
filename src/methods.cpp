@@ -497,18 +497,18 @@ void population::decide_link_entity(double sense_dist)
 #ifdef GPU
 #if 0
 __device__ __host__
-void inner_collision_kernel(unsigned int pop_size, double radius, unsigned int i, bool& res, double* pos_x, double* pos_y, char* d_bm)
+void inner_collision_kernel(unsigned int pop_size, double radius, unsigned int i, char* res, double* pos_x, double* pos_y, char* d_bm)
 {
 	unsigned int j = blockDim.x * blockIdx.x + threadIdx.x;
     if (j <= i || j >= pop_size) return;
 	
-	res = g_if_collision(pos_x, pos_y, i, j, radius, radius) ? true : res;
+	*res = g_if_collision(pos_x, pos_y, i, j, radius, radius) ? 1 : *res;
 	
 }
 #endif
 
 __global__
-void collision_kernel(unsigned int pop_size, double radius, bool& res, double* pos_x, double* pos_y, char* d_bm)
+void collision_kernel(unsigned int pop_size, double radius, char* res, double* pos_x, double* pos_y, char* d_bm)
 {
 	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= pop_size) return;
@@ -524,13 +524,14 @@ void collision_kernel(unsigned int pop_size, double radius, bool& res, double* p
 		if(g_if_collision(pos_x, pos_y, i, j, radius, radius)){
 			d_bm[i] = 1;
 			d_bm[j] = 1;
-			res = true;
+			*res = 1;
 		}
 	}
+	//printf("collision kernel: %f %f\n", pos_x[i], pos_y[i]);
 }
 
 __global__
-void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radius2, bool& res, double* pos_x, double* pos_y, char* d_bm)
+void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radius2, char* res, double* pos_x, double* pos_y, char* d_bm)
 {
 	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= pop_size) return;
@@ -539,9 +540,10 @@ void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double 
 		if(g_if_collision(pos_x, pos_y, i, pop_size + j, radius1, radius2)){
 			d_bm[i] = 1;
 			d_bm[pop_size+j] = 1;
-			res = true;
+			*res = 1;
 		}
 	}
+	//printf("collision diff kernel: %d %f %f\n", i, pos_x[i], pos_y[i]);
 }
 #endif
 
@@ -560,12 +562,22 @@ bool population::collision()
 	double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
 	double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
 	char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
+	char* d_res;
+	cudaError_t err = cudaMallocManaged((void **) &d_res, 1);
+	if(err != cudaSuccess)
+	{
+		printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
+		exit(EXIT_FAILURE);
+	}
+	*d_res = 0;
 
 	dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
 	dim3 threadsPerBlock(16, 1, 1);
 
-	collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, this->entities[0].radius, res, d_position_x, d_position_y, d_bm);
+	collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, this->entities[0].radius, d_res, d_position_x, d_position_y, d_bm);
 	cudaDeviceSynchronize();
+	res = *d_res ? true : res;
+
 #else
 	// Loop through each entity
 	for(unsigned int i = 0; i < this->pop_size; ++i){
@@ -607,27 +619,41 @@ bool population::init_collision()
 	double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
 	double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
 	char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
+	char* d_res;
+	cudaError_t err = cudaMallocManaged((void **) &d_res, 1);
+	if(err != cudaSuccess)
+	{
+		printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
+		exit(EXIT_FAILURE);
+	}
+	*d_res = 0;
+	cudaStream_t streams[2];
+	cudaStreamCreate(&streams[0]);
+	cudaStreamCreate(&streams[1]);
 
 	dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
 	dim3 threadsPerBlock(16, 1, 1);
 
 	// between entities
-	collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, this->entities[0].radius, res, d_position_x, d_position_y, d_bm);
-	
+	collision_kernel<<<blocksPerGrid,threadsPerBlock, 0, streams[0]>>>(this->pop_size, this->entities[0].radius, d_res, d_position_x, d_position_y, d_bm);
+
 	// between entities and objects
-	collision_diff_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, this->num_objs, this->entities[0].radius, this->objectives[0]->radius, res, d_position_x, d_position_y, d_bm);
+	collision_diff_kernel<<<blocksPerGrid,threadsPerBlock, 0, streams[1]>>>(this->pop_size, this->num_objs, this->entities[0].radius, this->objectives[0]->radius, d_res, d_position_x, d_position_y, d_bm);
 	
 	// between objects
 	for(unsigned int i = 0; i < this->num_objs; ++i){
 		for(unsigned int j = i+1; j < this->num_objs; ++j){
-			double radius = this->objectives[0]->radius;
-			if(g_if_collision(this->pop_size+i, this->pop_size+j, false, false, radius, radius)){
-				g_bm[this->pop_size+i] = 1;
-				g_bm[this->pop_size+j] = 1;
+			if(this->objectives[i]->if_collision(this->objectives[j])){
+				this->bm[this->pop_size+i].bit = 1;
+				this->bm[this->pop_size+j].bit = 1;
 				res = true;
 			}
 		}
 	}
+	
+	cudaDeviceSynchronize();
+	
+	res = *d_res ? true : res;
 
 #else
 	// between entities
@@ -636,17 +662,6 @@ bool population::init_collision()
 			if(this->entities[i].if_collision(this->entities[j])){
 				this->bm[i].bit = 1;
 				this->bm[j].bit = 1;
-				res = true;
-			}
-		}
-	}
-
-	// between objects
-	for(unsigned int i = 0; i < this->num_objs; ++i){
-		for(unsigned int j = i+1; j < this->num_objs; ++j){
-			if(this->objectives[i]->if_collision(this->objectives[j])){
-				this->bm[this->pop_size+i].bit = 1;
-				this->bm[this->pop_size+j].bit = 1;
 				res = true;
 			}
 		}
