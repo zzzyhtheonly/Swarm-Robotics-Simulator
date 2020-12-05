@@ -128,10 +128,10 @@ void render_log_function() {
                         draw_circle((id>=population_size), x,y);
                 }
         }
-	while (true) {
-		glutPostRedisplay();
-		sleep(100);
-	}
+	glFlush();
+	do {
+		std::cout << "Press a key to continue...";
+	} while (std::cin.get() != '\n');
         return;
 }
 
