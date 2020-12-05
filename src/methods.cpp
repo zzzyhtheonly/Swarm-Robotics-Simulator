@@ -530,7 +530,7 @@ void collision_kernel(unsigned int pop_size, double radius, bool& res, double* p
 }
 
 __global__
-void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radiu2, bool& res, double* pos_x, double* pos_y, char* d_bm)
+void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radius2, bool& res, double* pos_x, double* pos_y, char* d_bm)
 {
 	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= pop_size) return;
