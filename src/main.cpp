@@ -129,9 +129,8 @@ void render_log_function() {
                 }
         }
 	glFlush();
-	do {
-		std::cout << "Press a key to continue...";
-	} while (std::cin.get() != '\n');
+	std::cout << "Enter anything to end simulation:";
+	std::cin.get();
         return;
 }
 
