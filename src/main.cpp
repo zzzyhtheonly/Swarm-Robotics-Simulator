@@ -13,6 +13,7 @@ const string RAD_STR = "Radius:";
 const string NUM_OBJ_STR = "Num_Objectives:";
 const string OBJ_RAD_STR = "Objective_Radius:";
 const string CLR_STR = "CLEAR";
+const string LINE_STR = "LINE";
 
 /* arguments */
 unsigned int mode = 0;
@@ -84,21 +85,38 @@ void draw_circle(bool isObj, double x, double y){
 	glEnd();
 }
 
+void draw_line(double x1, double y1, double x2, double y2) {
+	glBegin(GL_LINES);
+		glVertex2f(x1, y1);
+		glVertex2f(x2, y2);
+	glEnd();	
+}
+
 void render_log_function() {
 	clear_screen();
         glOrtho(-ground_dimension, ground_dimension, -ground_dimension, ground_dimension, -ground_dimension, ground_dimension);
 
 	string line;
 	vector<string> words;
-	double x,y,r,g,b;
+	double x,y,x2,y2,r,g,b;
 	int id;
 
         while(getline(log_in, line)) {
                 words = tokenize(line);
-                if (words.size() <= 1) {
+                if (words[0] == CLR_STR) {
                         glFlush();
                         clear_screen();
-                } else {
+                } else if (words[0] == LINE_STR) {
+			x = stod(words[1]);
+			y = stod(words[2]);
+			x2 = stod(words[3]);
+			y2 = stod(words[4]);
+			r = stod(words[5]);
+			g = stod(words[6]);
+			b = stod(words[7]);
+			glColor3f(r,g,b);
+			draw_line(x,y,x2,y2);
+		} else {
                         id = stoi(words[0]);
                         x = stod(words[1]);
                         y = stod(words[2]);
@@ -243,6 +261,11 @@ void log_simulation()
 					//glColor3f(0.25, 0.0, 0.25);
 					r = 0.25; g = 0.0; b = 0.25;
 				}
+				vector<double> A_pos = test.entities[i].pos;
+				vector<double> B_pos = test.entities[i].link->previous->node->pos;
+				log_file << LINE_STR << "\t" << A_pos[0] << "\t" << A_pos[1] << "\t"
+					<< B_pos[0] << "\t" << B_pos[1] << "\t"
+					<< r << "\t" << g << "\t" << b << std::endl;
 				/*
 				glBegin(GL_LINES);
 					vector<double> B_pos = test.entities[i].link->previous->node->pos;
