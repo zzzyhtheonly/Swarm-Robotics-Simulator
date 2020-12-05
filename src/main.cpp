@@ -29,6 +29,7 @@ unsigned int max_time = 300;
 /* those are fixed at the moment */
 unsigned int dimension_size = 2;
 ofstream log_file("log.txt");
+bool log_intermediate = false;
 ifstream log_in("log2.txt");
 
 void clear_screen()
@@ -187,7 +188,8 @@ void log_simulation()
 		//cout << "DRAW-O" << endl;
 		check = clock();
 		for(unsigned int i = 0; i < test.num_objs; ++i){
-			test.objectives[i]->draw(r,g,b);
+			if (log_intermediate)
+				test.objectives[i]->draw(r,g,b);
 		}
 		draw_obj_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
@@ -226,8 +228,8 @@ void log_simulation()
 				//glColor3f(0.0, 0.0, 1.0);
 				r = 0.; g = 0.; b = 1.;
 			}
-
-			test.entities[i].draw(r,g,b);
+			if (log_intermediate)
+				test.entities[i].draw(r,g,b);
 		}
 		draw_entities_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
@@ -278,9 +280,11 @@ void log_simulation()
 				}
 				vector<double> A_pos = test.entities[i].pos;
 				vector<double> B_pos = test.entities[i].link->previous->node->pos;
-				log_file << LINE_STR << "\t" << A_pos[0] << "\t" << A_pos[1] << "\t"
-					<< B_pos[0] << "\t" << B_pos[1] << "\t"
-					<< r << "\t" << g << "\t" << b << std::endl;
+				if (log_intermediate) {
+					log_file << LINE_STR << "\t" << A_pos[0] << "\t" << A_pos[1] << "\t"
+						<< B_pos[0] << "\t" << B_pos[1] << "\t"
+						<< r << "\t" << g << "\t" << b << std::endl;
+				}
 				/*
 				glBegin(GL_LINES);
 					vector<double> B_pos = test.entities[i].link->previous->node->pos;
@@ -336,6 +340,46 @@ void log_simulation()
 			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
 			printf("\tMaintaining grid: %.2f%%\n", (grid_time/total_time)*100.);
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
+
+			/* Final draw for objectives */
+			r = 1.; g = 0.; b = 0.;
+			for(unsigned int i = 0; i < test.num_objs; ++i){
+                        	test.objectives[i]->draw(r,g,b);
+                	}
+			
+			/* Final draw for entities */
+			for(unsigned int i = 0; i < test.pop_size; ++i){
+                        	if (test.entities[i].status == LINK) {
+                                	if (test.entities[i].link->branch) {
+						r = 0.; g = 1.; b = .5;
+					} else {
+						r = 0.; g = 1.; b = 0.;
+					}
+				} else if (test.entities[i].status == PATH) {
+					r = .5; g = 0.; b = .5;
+				} else {
+					r = 0.; g = 0.; b = 1.;
+				}
+				test.entities[i].draw(r,g,b);
+			}
+	
+			/* Final draw for lines */
+			for(unsigned int i = 0; i < test.pop_size; ++i){
+                        	if (test.entities[i].status == LINK || test.entities[i].status == PATH) {
+                                	if (test.entities[i].status == LINK) {
+						r = 0.0; g = 0.5; b = 0.0;
+                                	}
+                                	else {
+						r = 0.25; g = 0.0; b = 0.25;
+					}
+					vector<double> A_pos = test.entities[i].pos;
+                                	vector<double> B_pos = test.entities[i].link->previous->node->pos;
+                                        log_file << LINE_STR << "\t" << A_pos[0] << "\t" << A_pos[1] << "\t"
+                                                << B_pos[0] << "\t" << B_pos[1] << "\t"
+                                                << r << "\t" << g << "\t" << b << std::endl;
+				}
+			}
+
 			log_file.close();
 			exit(0);
 		} else if (total_time >= last_status + status_freq) {
@@ -345,7 +389,8 @@ void log_simulation()
 
 		//glFlush();
 		//clear_screen();
-		log_file << CLR_STR << std::endl;
+		if (log_intermediate)
+			log_file << CLR_STR << std::endl;
 	}
 
 	//glFlush();
@@ -372,13 +417,19 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	while((opt = getopt(argc, argv, "lrt")) != -1)
+	while((opt = getopt(argc, argv, "lirt")) != -1)
 	{
 		switch(opt)
 		{
 			case 'l':
 				render_log(&argc, argv);
-				exit(0);
+				std::cout << "Press enter to close simulation" << std::endl;
+				char dummy;
+				std::cin >> dummy;
+				return 0;
+			case 'i':
+				log_intermediate = true;
+				break;
 			case 'r':
 				mode = RANDOM_INIT;
 				break;
