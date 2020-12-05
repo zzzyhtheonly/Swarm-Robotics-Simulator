@@ -432,6 +432,8 @@ bool population::collision()
 /* customized collsion test only used after initialization */
 bool population::init_collision()
 {
+	bool res = collision();
+	/*
 	bool res = false;
 	// between entities
 	for(unsigned int i = 0; i < this->pop_size; ++i){
@@ -442,7 +444,7 @@ bool population::init_collision()
 				res = true;
 			}
 		}
-	}
+	}*/
 
 	// between objects
 	for(unsigned int i = 0; i < this->num_objs; ++i){
@@ -493,7 +495,6 @@ void population::adjustment()
 			}
 		}
 	}
-
 	/* collision still exists, stop the entities detected collision */
 	while(collision()){
 		/* TODO: GPU version */
@@ -598,6 +599,10 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		this->bm.push_back(one_bit());
 	}
 
+        this->init_grid(radius, limit);
+        this->clear_grid();
+        this->assign_to_grid();
+
 	unsigned int retries = 0;
 	/* make sure the population is initialized with no collision, give a retry limitation to prevent forever loop */
 	while(init_collision() && retries++ < 99){
@@ -627,7 +632,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		exit(1);
 	}
 
-	this->init_grid(radius, limit);
+	//this->init_grid(radius, limit);
 	this->clear_grid();
 	this->assign_to_grid();
 }

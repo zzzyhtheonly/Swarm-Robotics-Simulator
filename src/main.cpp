@@ -174,12 +174,14 @@ void log_simulation()
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
+	cout << "Init time: " << init_time << endl;
 
 	double r,g,b;
 	while(timestamp++){
 		/* Draw objectives, no AI here */
 		//glColor3f(1.0, 0.0, 0.0);
 		r = 1.; g = 0.; b = 0.;
+		//cout << "DRAW-O" << endl;
 		check = clock();
 		for(unsigned int i = 0; i < test.num_objs; ++i){
 			test.objectives[i]->draw(r,g,b);
@@ -189,12 +191,14 @@ void log_simulation()
 		/* AI Loop: Perception -> Decision -> Action */
 		/* Preception */
 
+		//cout << "SENSE" << endl;
 		check = clock();
 		test.sense(sense_dist);		
 		sense_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		/* Decision */
 
+		//cout << "DECIDE" << endl;
 		check = clock();
 		test.decide(sense_dist);
 		decide_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
@@ -202,6 +206,7 @@ void log_simulation()
 		/* Action */
 		/* TODO: GPU version */
 		check = clock();
+		//cout << "DRAW-E" << endl;
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			if (test.entities[i].status == LINK) {
 				if (test.entities[i].link->branch) {
@@ -224,16 +229,19 @@ void log_simulation()
 		draw_entities_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		check = clock();
+		//cout << "MOVE-P" << endl;
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].move_prediction();
 		}
 		move_prediction_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
+		//cout << "ADJ" << endl;
 		check = clock();
 		test.adjustment();
 		adjustment_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 		
 		/* TODO: GPU version */
+		//cout << "MOVE" << endl;
 		check = clock();
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].move();
@@ -241,6 +249,7 @@ void log_simulation()
 		}
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
+		//cout << "GRID" << endl;
 		check = clock();
 		test.clear_grid();
 		test.assign_to_grid();
@@ -251,6 +260,7 @@ void log_simulation()
 			break;
 		}
 
+		//cout << "LINES" << endl;
 		check = clock();
 		/* Draw lines to better visualize what nodes are doing */
 		for(unsigned int i = 0; i < test.pop_size; ++i){
@@ -279,6 +289,7 @@ void log_simulation()
 		}
 		draw_lines_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
+		//cout << "COUNT" << endl;
 		unsigned int tmp_cnt = 0;
 		for (unsigned int i = 0; i < population_size; i++) {
 			switch (test.entities[i].status) {
