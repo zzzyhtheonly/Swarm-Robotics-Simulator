@@ -102,7 +102,8 @@ void render_log_function() {
 	double x,y,x2,y2,r,g,b;
 	unsigned int id;
 
-        while(getline(log_in, line)) {
+	std::getline(log_in, line);
+        while(line) {
                 words = tokenize(line);
                 if (words[0] == CLR_STR) {
                         glFlush();
@@ -127,7 +128,11 @@ void render_log_function() {
                         glColor3f(r,g,b);
                         draw_circle((id>=population_size), x,y);
                 }
+		std::getline(log_in, line);
         }
+	std::cout << "Press enter to close simulation" << std::endl;
+	string dummy;
+	std::cin >> dummy;
         return;
 }
 
