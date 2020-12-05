@@ -2,17 +2,9 @@
 #include <GL/gl.h>
 #include <iostream>
 #include <unistd.h>
-#include <time.h>
-#include <math.h> 
+#include <time.h> 
 
 #include "headers.h"
-
-const string GRD_DIM_STR = "Ground_Dim:";
-const string NUM_ENT_STR = "Num_Entities:";
-const string RAD_STR = "Radius:";
-const string NUM_OBJ_STR = "Num_Objectives:";
-const string OBJ_RAD_STR = "Objective_Radius:";
-const string CLR_STR = "CLEAR";
 
 /* arguments */
 unsigned int mode = 0;
@@ -30,16 +22,6 @@ unsigned int dimension_size = 2;
 #ifdef GPU
 ofstream log_file("log.txt");
 #endif
-ifstream log_in("log2.txt");
-
-__global__
-void device_print_something(unsigned int pop_size, double* pos_x, double* pos_y, char* bm)
-{
-	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= pop_size) return;
-	
-	printf("%f %f\n", pos_x[i], pos_y[i]);
-}
 
 // Source: http://www.david-amador.com/2012/09/how-to-take-screenshot-in-opengl/
 bool save_screenshot(string filename, int w, int h)
@@ -87,103 +69,6 @@ void clear_screen()
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
-vector<string> tokenize(string line) {
-        vector<string> words;
-        int i = 0;
-        int j = 0;
-        while (i < line.size()) {
-                if (line[i] == '\t' || i == line.size()-1) {
-                        words.push_back(line.substr(j, i-j+(i==line.size()-1)));
-                        j = i+1;
-                }
-                i++;
-        }
-        return words;
-}
-
-void parse_global_params(vector<string> words) {
-	if (words[0] == GRD_DIM_STR) {
-		ground_dimension = stod(words[1]);
-		std::cout << GRD_DIM_STR << " " << ground_dimension << std::endl;
-	} else if (words[0] == NUM_ENT_STR) {
-		population_size = stoi(words[1]);
-		std::cout << NUM_ENT_STR << " " << population_size << std::endl;
-	} else if (words[0] == RAD_STR) {
-		radius = stod(words[1]);
-		std::cout << RAD_STR << " " << radius << std::endl;
-	} else if (words[0] == NUM_OBJ_STR) {
-		number_objectives = stoi(words[1]);
-		std::cout << NUM_OBJ_STR << " " << number_objectives << std::endl;
-	} else if (words[0] == OBJ_RAD_STR) {
-		objective_radius = stod(words[1]);
-		std::cout << OBJ_RAD_STR << " " << objective_radius << std::endl;
-	}
-}
-
-void draw_circle(bool isObj, double x, double y){
-	unsigned int count = 20;
-        GLfloat twicePi = 2.0f * M_PI;
-	double r = radius;
-	if (isObj) r = objective_radius;
-
-	glBegin(GL_TRIANGLE_FAN);
-		glVertex2f(x, y);
-
-                for(unsigned int i = 0; i <= count; ++i) {
-                        glVertex2f(x + (r * cos(i * twicePi / count)), y + (r * sin(i * twicePi / count)));
-                }
-	glEnd();
-}
-
-void render_log_function() {
-	clear_screen();
-        glOrtho(-ground_dimension, ground_dimension, -ground_dimension, ground_dimension, -ground_dimension, ground_dimension);
-
-	string line;
-	vector<string> words;
-	double x,y,r,g,b;
-	int id;
-
-        while(getline(log_in, line)) {
-                words = tokenize(line);
-                if (words.size() <= 1) {
-                        glFlush();
-                        clear_screen();
-                } else {
-                        id = stoi(words[0]);
-                        x = stod(words[1]);
-                        y = stod(words[2]);
-                        r = stod(words[3]);
-                        g = stod(words[4]);
-                        b = stod(words[5]);
-                        glColor3f(r,g,b);
-                        draw_circle((id>=population_size), x,y);
-                }
-        }
-        return;
-}
-
-void render_log(int *argcp, char **argv)
-{
-	string line;
-	for (int i = 0; i < 5; i++) {
-		getline(log_in, line);
-		parse_global_params(tokenize(line));
-	}
-
-	/* init window */
-        glutInit(argcp, argv);
-        glutInitDisplayMode(GLUT_SINGLE);
-        glutInitWindowSize(500, 500);
-        glutInitWindowPosition(100, 100);
-        glutCreateWindow("Robots simulator demo - rendering log file");
-        /* display */
-        glutDisplayFunc(render_log_function);
-        glutMainLoop();
-
-	return;
-}
-
 void render_function()
 {
 	clear_screen();
@@ -203,31 +88,17 @@ void render_function()
 	double adjustment_time = 0;
 	double move_time = 0;
 	double draw_lines_time = 0;
-	double grid_time = 0;
-	double video_time = 0;
 	clock_t start = clock();
-	clock_t last_video = clock();
-	unsigned int video_ctr = 0;
 
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
 	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
-  
 #ifdef GPU
 	cout << "end of gpu version" << endl;
-	video_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
-	
-#if 0
-	dim3 blocksPerGrid(ceil((population_size)/16.0), 1, 1);
-	dim3 threadsPerBlock(16, 1, 1);
-	double* d_position_x =  thrust::raw_pointer_cast(&test.position_x[0]);
-	double* d_position_y =  thrust::raw_pointer_cast(&test.position_y[0]);
-	char* d_bm =  thrust::raw_pointer_cast(&test.g_bm[0]);
-	device_print_something<<<blocksPerGrid,threadsPerBlock>>>(population_size, d_position_x, d_position_y, d_bm);
+	cout << test.position_x[test.pop_size] << endl;
+	cout << test.position_next_x[test.pop_size-2] << endl;
+	cout << (int)test.g_bm[test.pop_size-2] << endl;
 #endif
-	cout << video_time << endl;
-#endif
-  
 	double r,g,b;
 	while(timestamp++){
 		/* Draw objectives, no AI here */
@@ -288,6 +159,7 @@ void render_function()
 		
 		/* TODO: GPU version */
 		check = clock();
+		
 		#ifdef GPU
 			test.advance_robot();
         #else
@@ -296,11 +168,6 @@ void render_function()
             }
 		#endif
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
-
-		check = clock();
-		test.clear_grid();
-		test.assign_to_grid();
-		grid_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		/* for leftmost mode, check if all entities reach the rightmost */
 		if(mode == LEFTMOST_INIT && test.terminate()){
@@ -342,30 +209,16 @@ void render_function()
 			printf("\tAdjustments: %.2f%%\n", (adjustment_time/total_time)*100.);
 			printf("\tMoving: %.2f%%\n", (move_time/total_time)*100.);
 			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
-			printf("\tMaintaining grid: %.2f%%\n", (grid_time/total_time)*100.);
-			printf("\tRendering video: %.2f%%\n", (video_time/total_time)*100.);
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
-			std::cout << "\nNumber of updates: " << timestamp-1 << std::endl;
 			save_screenshot("out.tga", 500, 500);
 #ifdef GPU
 			log_file.close();
 #endif
 			exit(0);
 		}
-		
-		check = clock();
-		double time_since_last_screen = ((double)(clock() - last_video))/ CLOCKS_PER_SEC;
-		if (time_since_last_screen > 0.025) {
-			save_screenshot("./video/"  + std::to_string(video_ctr) + ".tga", 500, 500);
-			video_ctr++;
-			last_video = clock();
-		}
-		video_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
-		
 
 		glFlush();
 		clear_screen();
-		log_file << CLR_STR << std::endl;
 	}
 
 	glFlush();
@@ -392,13 +245,10 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	while((opt = getopt(argc, argv, "lrt")) != -1)
+	while((opt = getopt(argc, argv, "rt")) != -1)
 	{
 		switch(opt)
 		{
-			case 'l':
-				render_log(&argc, argv);
-				exit(0);
 			case 'r':
 				mode = RANDOM_INIT;
 				break;
@@ -430,14 +280,11 @@ int main(int argc, char* argv[])
 	if (optind < argc){
 		max_time = atoi(argv[optind++]);
 	}
-
-	log_file << GRD_DIM_STR << "\t" << std::to_string(ground_dimension) << std::endl
-		<< NUM_ENT_STR << "\t" << std::to_string(population_size) << std::endl
-		<< RAD_STR << "\t" << std::to_string(radius) << std::endl
-		<< NUM_OBJ_STR << "\t" << std::to_string(number_objectives) << std::endl
-		<< OBJ_RAD_STR << "\t" << std::to_string(radius) << std::endl;
-
 #ifdef GPU
+	log_file << "Ground_Dim:\t" << std::to_string(ground_dimension) << std::endl
+		<< "Radius:\t" << std::to_string(radius) << std::endl
+		<< "Objective_Rad:\t" << std::to_string(radius) << std::endl;
+
 	render_function();
 #else
 	/* init window */

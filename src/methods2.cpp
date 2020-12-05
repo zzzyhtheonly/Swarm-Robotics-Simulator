@@ -2,7 +2,6 @@
 #include <GL/freeglut.h>
 #include <math.h>
 #include <bits/stdc++.h>
-#include <algorithm>
 #include <string>
 #include "headers.h"
 
@@ -18,7 +17,8 @@ char *g_bm = nullptr;
 __device__ __host__ void print_pos(double*, double*, int);
 
 
-__device__ __host__ void g_move(unsigned int, double *, double *, double * , double *, int *, double);
+__device__ __host__ void g_move(unsigned int, double *, double *, double *, 
+							double *, double * , double *, int *, double );
 __device__ __host__ bool _g_move(unsigned int , double *, double *, double *, double *, double );
 
 // This is the move that is launched from CPU and GPU runs it for each cell
@@ -26,32 +26,31 @@ __global__ void move_kernel(double *position_x, double *position_y, double *posi
 	double *position_next_y, double *velocity_x, double *velocity_y, int *status, int pop_size, double limit)
 {
     unsigned int index = blockDim.x * blockIdx.x + threadIdx.x;
-   //  if (index >= pop_size) return;
-   //  if(status[index] == 1){
-	  //   status[index] = 2;
-	  //   return;
-	  // }
+    if (index >= pop_size) return;
+    if(status[index] == 1){
+	    status[index] = 2;
+	    return;
+	  }
 
-	  // if(status[index] == 2){
-	  //   status[index] = 3;
-	  // }
+	  if(status[index] == 2){
+	    status[index] = 3;
+	  }
 
-	  // double tmp = position_x[index] + velocity_x[index];
-	  // if(tmp > limit || tmp < -limit){
-	  //       velocity_x[index] = -velocity_x[index];
-	  // }
-	  // tmp = position_y[index] + velocity_y[index];
-	  // if(tmp > limit || tmp < -limit){
-	  //       velocity_y[index] = -velocity_y[index];
-	  // }
-	  // position_x[index] += velocity_x[index];
-	  // position_y[index] += velocity_y[index];
+	  double tmp = position_x[index] + velocity_x[index];
+	  if(tmp > limit || tmp < -limit){
+	        velocity_x[index] = -velocity_x[index];
+	  }
+	  tmp = position_y[index] + velocity_y[index];
+	  if(tmp > limit || tmp < -limit){
+	        velocity_y[index] = -velocity_y[index];
+	  }
+	  position_x[index] += velocity_x[index];
+	  position_y[index] += velocity_y[index];
 	  
-	  // /* update pos_next after real movement */
-	  // position_next_x[index] = position_x[index];
-	  // position_next_y[index] = position_y[index];
-   //   // printf("%d, %f %f\n", index, position_x[index], position_y[index]);
-    g_move(index, position_x, position_y, velocity_x, velocity_y, status, limit);
+	  /* update pos_next after real movement */
+	  position_next_x[index] = position_x[index];
+	  position_next_y[index] = position_y[index];
+     // printf("%d, %f %f\n", index, position_x[index], position_y[index]);
 }
 #endif
 
@@ -154,7 +153,6 @@ individual::individual(unsigned int dimension, double radius, double limit, unsi
 	this->radius = radius;
 	this->status = READY;
 	this->mode = mode;
-	this->id = id;
 
 	/* initialize coordinates and velocities randomly */
 	random_device dev;
@@ -252,27 +250,6 @@ void individual::move_prediction()
  */
 #ifdef GPU
 /* test collision base on given two indices */
-__device__ __host__
-bool g_if_collision(double* pos_x, double* pos_y, unsigned int first, unsigned int second, double first_radius, double second_radius)
-{
-	double distance = 0;
-	double x1, x2, y1, y2;
-	
-	x1 = pos_x[first];
-	x2 = pos_x[second];
-	y1 = pos_y[first];
-	y2 = pos_y[second];
-	
-	double tmp = x1 - x2;
-	distance += (tmp * tmp);
-	tmp = y1 - y2;
-	distance += (tmp * tmp);
-
-	distance = sqrt(distance);
-
-	return distance < first_radius + second_radius ? true : false;
-}
-
 bool population::g_if_collision(unsigned int first, unsigned int second, bool first_use_pos_next, bool second_use_pos_next, double first_radius, double second_radius)
 {
 	double distance = 0;
@@ -318,7 +295,6 @@ bool individual::if_collision(individual another)
 	}
 
 	distance = sqrt(distance);
-	//cout << distance << endl;
 
 	return distance < this->radius + another.radius ? true : false;
 }
@@ -363,11 +339,6 @@ bool individual::if_sense(objective *another, double sense_dist) {
 	return distance < this->radius + sense_dist + another->radius ? true : false;	
 }
 
-void individual::grid_coordinates(unsigned int &x, unsigned int &y, double limit, double cell) {
-	x = (unsigned int)((this->pos[0]+limit)/cell);
-	y = (unsigned int)((this->pos[1]+limit)/cell);	
-}
-
 void population::sense(double sense_dist)
 {
 	sense_objectives(sense_dist);
@@ -393,42 +364,20 @@ void population::sense_objectives(double sense_dist)
 within a path) within sensing distance of at least one other linked entity? */
 void population::sense_entities(double sense_dist)
 {	
-
-	unsigned int left_x, right_x, up_y, down_y;
-	double l = this->dim_limit;
-	double c = this->cell_size;
-	double s = sense_dist + this->entities[0].radius*2;
-
-	/* TODO: make it supports GPU */
-
-	// Loop through each entity
-	for(unsigned int i = 0; i < this->pop_size; ++i){
-		/* Continue to next entity if in tree */
+	for (unsigned int i = 0; i < this->pop_size; ++i){
+		/* Continue to next entity if on objective */
 		if (this->entities[i].status == ON_OBJ ||
 			this->entities[i].status == LINK ||
 			this->entities[i].status == PATH)
 			continue;
-		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
-		left_x = max(0, (int)(((this->entities[i].pos[0]+l)-s)/c));
-		right_x = min((int)this->grid_size-1, (int)(((this->entities[i].pos[0]+l)+s)/c));
-		down_y = max(0, (int)(((this->entities[i].pos[1]+l)-s)/c));
-		up_y = min((int)this->grid_size-1, (int)(((this->entities[i].pos[1]+l)+s)/c));
-		// Compare current entity to all other entities in current/adjacent cells
-		for (unsigned int x = left_x; x <= right_x; x++) {
-			for (unsigned int y = down_y; y <= up_y; y++) {
-				// Iterate through all entities in comparison cell
-				for (unsigned int k = 0; k < this->grid[x][y].size(); k++) {
-					// j = index of comparison entity (index in this->entities)
-					unsigned int j = this->grid[x][y][k];
-					// Check if "sensing self"
-					if (i == j) continue;
-					//cout << i << " | " << j << endl;
-					if (this->entities[i].if_sense(this->entities[j], sense_dist) && 
-						this->entities[j].status == LINK) {
-						//std::cout << "Entity " << i << " sensed entity " << j << std::endl;
-						this->entities[i].status = SENSE;
-					}
-				}
+		/* Is an entity within sensing distance of another entity
+		who is in a linked tree? */
+		for (unsigned int j = 0; j < this->pop_size; ++j) {
+			if (i == j) continue;
+			if (this->entities[i].if_sense(this->entities[j], sense_dist) && 
+				this->entities[j].status == LINK) {
+				//std::cout << "Entity " << i << " sensed entity " << j << std::endl;
+				this->entities[i].status = SENSE;
 			}
 		}
 	}
@@ -513,120 +462,21 @@ void population::decide_link_entity(double sense_dist)
 	}	
 }
 
-/* test if collision exists otherwise update collision bitmap 
-	comparisons are only made to nearby entities */
-#ifdef GPU
-#if 0
-__device__ __host__
-void inner_collision_kernel(unsigned int pop_size, double radius, unsigned int i, char* res, double* pos_x, double* pos_y, char* d_bm)
-{
-	unsigned int j = blockDim.x * blockIdx.x + threadIdx.x;
-    if (j <= i || j >= pop_size) return;
-	
-	*res = g_if_collision(pos_x, pos_y, i, j, radius, radius) ? 1 : *res;
-	
-}
-#endif
-
-__global__
-void collision_kernel(unsigned int pop_size, double radius, char* res, double* pos_x, double* pos_y, char* d_bm)
-{
-	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= pop_size) return;
-
-#if 0	
-	dim3 blocksPerGrid(ceil((pop_size)/16.0), 1, 1);
-	dim3 threadsPerBlock(16, 1, 1);
-
-	inner_collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(pop_size, radius, i, res, pos_x, pos_y, d_bm);
-#endif
-	
-	for(unsigned int j = i+1; j < pop_size; ++j){
-		if(g_if_collision(pos_x, pos_y, i, j, radius, radius)){
-			d_bm[i] = 1;
-			d_bm[j] = 1;
-			*res = 1;
-		}
-	}
-	//printf("collision kernel: %f %f\n", pos_x[i], pos_y[i]);
-}
-
-__global__
-void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radius2, char* res, double* pos_x, double* pos_y, char* d_bm)
-{
-	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= pop_size) return;
-	
-	for(unsigned int j = 0; j < obj_size; ++j){
-		if(g_if_collision(pos_x, pos_y, i, pop_size + j, radius1, radius2)){
-			d_bm[i] = 1;
-			d_bm[pop_size+j] = 1;
-			*res = 1;
-		}
-	}
-	//printf("collision diff kernel: %d %f %f\n", i, pos_x[i], pos_y[i]);
-}
-#endif
-
+/* test if collision exists otherwise update collision bitmap */
 bool population::collision()
 {
-
 	bool res = false;
-	unsigned int left_x, right_x, up_y, down_y;
-	double l = this->dim_limit;
-	double c = this->cell_size;
-	double r = this->entities[0].radius*2;
 
 	/* TODO: make it supports GPU */
-
-#ifdef GPU
-	double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
-	double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
-	char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
-	char* d_res;
-	cudaError_t err = cudaMallocManaged((void **) &d_res, 1);
-	if(err != cudaSuccess)
-	{
-		printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
-		exit(EXIT_FAILURE);
-	}
-	*d_res = 0;
-
-	dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
-	dim3 threadsPerBlock(16, 1, 1);
-
-	collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, this->entities[0].radius, d_res, d_position_x, d_position_y, d_bm);
-	cudaDeviceSynchronize();
-	res = *d_res ? true : res;
-
-#else
-	// Loop through each entity
 	for(unsigned int i = 0; i < this->pop_size; ++i){
-		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
-		left_x = max(0, (int)((this->entities[i].pos[0]+l-r)/c));
-		right_x = min((int)this->grid_size-1, (int)((this->entities[i].pos[0]+l+r)/c));
-		down_y = max(0, (int)((this->entities[i].pos[1]+l-r)/c));
-		up_y = min((int)this->grid_size-1, (int)((this->entities[i].pos[1]+l+r)/c));
-		// Compare current entity to all other entities in current/adjacent cells
-		for (unsigned int x = left_x; x <= right_x; x++) {
-			for (unsigned int y = down_y; y <= up_y; y++) {
-				// Iterate through all entities in comparison cell
-				for (unsigned int k = 0; k < this->grid[x][y].size(); k++) {
-					// j = index of comparison entity (index in this->entities)
-					unsigned int j = this->grid[x][y][k];
-					// Check if "comparing to self"
-					if (i == j) continue;
-					// If colliding with another, then do collision behavior
-					if (this->entities[i].if_collision(this->entities[j])) {
-						this->bm[i].bit=1;
-						this->bm[j].bit=1;
-						res = true;
-					}
-				}
+		for(unsigned int j = i+1; j < this->pop_size; ++j){
+			if(this->entities[i].if_collision(this->entities[j])){
+				this->bm[i].bit = 1;
+				this->bm[j].bit = 1;
+				res = true;
 			}
 		}
 	}
-#endif
 
 	return res;
 }
@@ -637,45 +487,17 @@ bool population::init_collision()
 	bool res = false;
 	
 #ifdef GPU
-	double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
-	double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
-	char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
-	char* d_res;
-	cudaError_t err = cudaMallocManaged((void **) &d_res, 1);
-	if(err != cudaSuccess)
-	{
-		printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__);
-		exit(EXIT_FAILURE);
-	}
-	*d_res = 0;
-	cudaStream_t streams[2];
-	cudaStreamCreate(&streams[0]);
-	cudaStreamCreate(&streams[1]);
-
-	dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
-	dim3 threadsPerBlock(16, 1, 1);
-
-	// between entities
-	collision_kernel<<<blocksPerGrid,threadsPerBlock, 0, streams[0]>>>(this->pop_size, this->entities[0].radius, d_res, d_position_x, d_position_y, d_bm);
-
-	// between entities and objects
-	collision_diff_kernel<<<blocksPerGrid,threadsPerBlock, 0, streams[1]>>>(this->pop_size, this->num_objs, this->entities[0].radius, this->objectives[0]->radius, d_res, d_position_x, d_position_y, d_bm);
-	
-	// between objects
-	for(unsigned int i = 0; i < this->num_objs; ++i){
-		for(unsigned int j = i+1; j < this->num_objs; ++j){
-			if(this->objectives[i]->if_collision(this->objectives[j])){
-				this->bm[this->pop_size+i].bit = 1;
-				this->bm[this->pop_size+j].bit = 1;
+	for(unsigned int i = 0; i < this->pop_size + this->num_objs; ++i){
+		for(unsigned int j = i+1; j < this->pop_size + this->num_objs; ++j){
+			double radius_1 = i >= this->pop_size ? this->objectives[i-this->pop_size]->radius : this->entities[i].radius;
+			double radius_2 = j >= this->pop_size ? this->objectives[j-this->pop_size]->radius : this->entities[j].radius;
+			if(g_if_collision(i, j, false, false, radius_1, radius_2)){
+				g_bm[i] = 1;
+				g_bm[j] = 1;
 				res = true;
 			}
 		}
 	}
-	
-	cudaDeviceSynchronize();
-	
-	res = *d_res ? true : res;
-
 #else
 	// between entities
 	for(unsigned int i = 0; i < this->pop_size; ++i){
@@ -683,6 +505,17 @@ bool population::init_collision()
 			if(this->entities[i].if_collision(this->entities[j])){
 				this->bm[i].bit = 1;
 				this->bm[j].bit = 1;
+				res = true;
+			}
+		}
+	}
+
+	// between objects
+	for(unsigned int i = 0; i < this->num_objs; ++i){
+		for(unsigned int j = i+1; j < this->num_objs; ++j){
+			if(this->objectives[i]->if_collision(this->objectives[j])){
+				this->bm[this->pop_size+i].bit = 1;
+				this->bm[this->pop_size+j].bit = 1;
 				res = true;
 			}
 		}
@@ -760,7 +593,7 @@ bool population::terminate()
 }
 
 void population::form_path(individual *linked1, individual *linked2, individual *finder) {
-	//linked_tree *prev;
+	linked_tree *prev;
 	linked_tree *tmp = linked1->link;
 	while (tmp->node != tmp->root) {
 		((individual *)tmp->node)->status = PATH;
@@ -775,38 +608,6 @@ void population::form_path(individual *linked1, individual *linked2, individual 
 	finder->velocity = vector<double>(this->dim, 0);
 	finder->link = new linked_tree(linked1->link->root, linked1->link, finder);
 	std::cout << "FOUND A PATH" << std::endl;
-}
-
-void population::init_grid(double radius, double dimension_limit) {
-	this->cell_size = 1;
-	while (cell_size < (radius*2)) { cell_size *= 2; }
-	this->grid_size = ((dimension_limit*2)/cell_size)+1;
-
-	this->grid = new vector<unsigned int> *[grid_size];
-	for (unsigned int i = 0; i < grid_size; i++) {
-		this->grid[i] = new vector<unsigned int> [grid_size];
-		for (unsigned int j = 0; j < grid_size; j++) {
-			this->grid[i][j] = vector<unsigned int>();
-		}
-	}
-	std::cout << "Grid is " << grid_size << " by " << grid_size << " with cell size " << cell_size << std::endl;
-}
-
-void population::clear_grid() {
-	for (unsigned int i = 0; i < grid_size; i++) {
-		for (unsigned int j = 0; j < grid_size; j++) {
-			this->grid[i][j].clear();
-		}
-	}
-}
-
-void population::assign_to_grid() {
-	unsigned int grid_x,grid_y;
-	for (unsigned int i = 0; i < this->pop_size; i++) {
-		// grid_x, grid_y are being passed by reference
-		this->entities[i].grid_coordinates(grid_x, grid_y, this->dim_limit, this->cell_size);	
-		this->grid[grid_x][grid_y].push_back(this->entities[i].id);
-	}
 }
 
 #ifdef GPU
@@ -829,7 +630,6 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->pop_size = size;
 	this->num_objs = num_objectives;
 	this->dim = dimension;
-	this->dim_limit = limit;
 
 #ifdef GPU
 	this->position_x = thrust::device_vector<double>(size+num_objectives, 0);
@@ -840,6 +640,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->velocity_y = thrust::device_vector<double>(size, 0);
 	this->g_status = thrust::device_vector<double>(size, 2);
 	this->g_bm = thrust::device_vector<char>(size+num_objectives, 0);
+	this->limit = limit;
 #if 0
 	gpu_uni_malloc((void **) &g_pos_x, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_y, (size+num_objectives) * sizeof(double));
@@ -905,10 +706,6 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 			   << endl;
 		exit(1);
 	}
-
-	this->init_grid(radius, limit);
-	this->clear_grid();
-	this->assign_to_grid();
 }
 
 
@@ -946,7 +743,7 @@ void population::advance_robot()
 
 
   move_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_position_next_x,
-   d_position_next_y, d_velocity_x, d_velocity_y, d_g_status, pop_size, this->entities[0].limit);
+   d_position_next_y, d_velocity_x, d_velocity_y, d_g_status, pop_size, this->limit);
   cudaDeviceSynchronize();
 
   for (unsigned int i = 0; i < this->pop_size; ++i){
@@ -991,8 +788,8 @@ bool _g_move(unsigned int index, double *position_x, double *position_y,
 
 /* movement with respect to veclocity */
 __device__ __host__ 
-void g_move(unsigned int index, double *position_x, double *position_y, 
-  double * velocity_x, double *velocity_y, int *status, double limit)
+void g_move(unsigned int index, double *position_x, double *position_y, double *position_next_x, 
+	double *position_next_y, double * velocity_x, double *velocity_y, int *status, double limit)
 {
   if(status[index] == 1){
     status[index] = 2;
@@ -1003,11 +800,19 @@ void g_move(unsigned int index, double *position_x, double *position_y,
     status[index] = 3;
   }
 
-  _g_move(index, position_x, position_y, velocity_x, velocity_y, limit);
+  double tmp = position_x[index] + velocity_x[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_x[index] = -velocity_x[index];
+  }
+  tmp = position_y[index] + velocity_y[index];
+  if(tmp > limit || tmp < -limit){
+        velocity_y[index] = -velocity_y[index];
+  }
+  position_x[index] += velocity_x[index];
+  position_y[index] += velocity_y[index];
   
   /* update pos_next after real movement */
-  // for(unsigned int i = 0; i < this->dimension; ++i){
-  //   this->pos_next[i] = this->pos[i];
-  // }
+  position_next_x[index] = position_x[index];
+  position_next_y[index] = position_y[index];
 }
 #endif

@@ -1,5 +1,4 @@
 #include <vector>
-#include <list>
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
@@ -33,9 +32,6 @@ class drawable;
 class objective;
 class individual;
 class population;
-
-extern double radius;
-extern double objective_radius;
 
 /* define a one bit data structure for bitmap */
 typedef struct one_bit
@@ -129,7 +125,6 @@ public:
 class individual : public drawable
 {
 public:
-	unsigned int id = -1;
 	/* current status */
 	states status;
 
@@ -163,8 +158,6 @@ public:
 	bool if_sense(individual another, double sense_dist);
 	bool if_sense(objective *another, double sense_dist);
 
-	void grid_coordinates(unsigned int &x, unsigned int &y, double limit, double cell);
-
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
 };
@@ -173,7 +166,7 @@ public:
 class population
 {
 public:
-	
+
 #ifdef GPU
     thrust::device_vector<double> position_x;
     thrust::device_vector<double> position_y;
@@ -183,6 +176,7 @@ public:
     thrust::device_vector<double> velocity_y; 
     thrust::device_vector<int> g_status;
 	thrust::device_vector<char> g_bm;
+	double limit;
 	
 	void birth_robot();       // pushes back one more robot data to the device_vectors
     void advance_robot();    // launches the move that adds velocity to positions
@@ -200,18 +194,12 @@ public:
 
 	/* Dimension of simulation */
 	unsigned int dim;
-	double dim_limit;
 
 	/* objectives for population, represented by drawables */
 	vector<objective *> objectives;
 
 	/* bitmap of all entities, 1 means collison detected */
 	vector<one_bit> bm; 
-
-	/* Grid for detecting collisions */
-	vector<unsigned int> **grid;
-	unsigned int cell_size;
-	unsigned int grid_size;
 
 	/* construct functions */
 	population() = delete;
@@ -241,10 +229,6 @@ public:
 	bool terminate();
 
 	void form_path(individual *linked1, individual *linked2, individual *finder);
-
-	void init_grid(double radius, double dimension_limit);
-	void clear_grid();
-	void assign_to_grid();
 	
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}
