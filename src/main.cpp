@@ -39,8 +39,8 @@ void clear_screen()
 
 vector<string> tokenize(string line) {
         vector<string> words;
-        int i = 0;
-        int j = 0;
+        unsigned int i = 0;
+        unsigned int j = 0;
         while (i < line.size()) {
                 if (line[i] == '\t' || i == line.size()-1) {
                         words.push_back(line.substr(j, i-j+(i==line.size()-1)));
@@ -99,7 +99,7 @@ void render_log_function() {
 	string line;
 	vector<string> words;
 	double x,y,x2,y2,r,g,b;
-	int id;
+	unsigned int id;
 
         while(getline(log_in, line)) {
                 words = tokenize(line);
@@ -154,6 +154,7 @@ void render_log(int *argcp, char **argv)
 void log_simulation()
 {
 	unsigned long timestamp = 1;
+	unsigned int done_count = 0;
 
 	/* timing accumulators */
 	clock_t check;
@@ -168,6 +169,7 @@ void log_simulation()
 	double draw_lines_time = 0;
 	double grid_time = 0;
 	clock_t start = clock();
+	clock_t last_update = start;
 
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
@@ -275,18 +277,40 @@ void log_simulation()
 				*/
 			}
 		}
-		draw_lines_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;	
+		draw_lines_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+
+		unsigned int tmp_cnt = 0;
+		for (unsigned int i = 0; i < population_size; i++) {
+			switch (test.entities[i].status) {
+				case READY:
+				case RUNNING:
+				case STOP:
+				case SENSE:
+					break;
+				default:
+					tmp_cnt++;
+			}
+		}
+		if (tmp_cnt > done_count) {
+			done_count = tmp_cnt;
+			last_update = clock();
+		}	
 
 		double total_time = ((double)(clock() - start))/ CLOCKS_PER_SEC;
-		if (total_time >= max_time) {
+		if (total_time >= max_time || done_count >= population_size) {
 			double unaccounted = total_time;
 			unaccounted -= init_time + draw_obj_time + draw_entities_time + sense_time;
 			unaccounted -= decide_time + move_prediction_time + adjustment_time;
 			unaccounted -= move_time + draw_lines_time;
 
+			double last_update_secs = ((double)(last_update - start)) / CLOCKS_PER_SEC;
+
+			std::cout << "\nSimulation Complete\n--------------------" << std::endl;
 			std::cout << "Ran for " << total_time << " seconds." << std::endl;
-			std::cout << "\nNumber of updates: " << timestamp-1 << "\n" << std::endl;
-			std::cout << "Timing breakdown\n--------------------" << std::endl;
+			std::cout << "Number of updates: " << timestamp-1 << std::endl;
+			std::cout << "Time of last update: " << last_update_secs << std::endl;
+			std::cout << "Number of entities done: " << done_count << std::endl;
+			std::cout << "\nTiming breakdown\n--------------------" << std::endl;
 			printf("\tInitialization: %.2f%%\n", (init_time/total_time)*100.);
 			printf("\tDrawing objectives: %.2f%%\n", (draw_obj_time/total_time)*100.);
 			printf("\tDrawing entities: %.2f%%\n", (draw_entities_time/total_time)*100.);
