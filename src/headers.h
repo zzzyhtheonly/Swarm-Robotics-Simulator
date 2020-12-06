@@ -1,5 +1,6 @@
 #include <vector>
 #include <list>
+
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
@@ -129,7 +130,9 @@ public:
 class individual : public drawable
 {
 public:
+
 	unsigned int id = -1;
+
 	/* current status */
 	states status;
 
@@ -173,7 +176,7 @@ public:
 class population
 {
 public:
-	
+
 #ifdef GPU
     thrust::device_vector<double> position_x;
     thrust::device_vector<double> position_y;
@@ -181,8 +184,10 @@ public:
     thrust::device_vector<double> position_next_y;
     thrust::device_vector<double> velocity_x;
     thrust::device_vector<double> velocity_y; 
+
     thrust::device_vector<int> g_status;
 	thrust::device_vector<char> g_bm;
+	double limit;
 	
 	void birth_robot();       // pushes back one more robot data to the device_vectors
     void advance_robot();    // launches the move that adds velocity to positions
@@ -200,7 +205,9 @@ public:
 
 	/* Dimension of simulation */
 	unsigned int dim;
+
 	double dim_limit;
+
 
 	/* objectives for population, represented by drawables */
 	vector<objective *> objectives;

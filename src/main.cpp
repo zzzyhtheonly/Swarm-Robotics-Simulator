@@ -2,6 +2,7 @@
 #include <GL/gl.h>
 #include <iostream>
 #include <unistd.h>
+
 #include <time.h>
 #include <math.h> 
 
@@ -30,20 +31,22 @@ unsigned int dimension_size = 2;
 #ifdef GPU
 ofstream log_file("log.txt");
 #endif
+
 ifstream log_in("log2.txt");
 
 __global__
 void device_print_something(unsigned int pop_size, double* pos_x, double* pos_y, char* bm)
 {
-	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= pop_size) return;
-	
-	printf("%f %f\n", pos_x[i], pos_y[i]);
+    
+    printf("%f %f\n", pos_x[i], pos_y[i]);
 }
+
 
 // Source: http://www.david-amador.com/2012/09/how-to-take-screenshot-in-opengl/
 bool save_screenshot(string filename, int w, int h)
-{	
+{   
   //This prevents the images getting padded 
  // when the width multiplied by 3 is not a multiple of 4
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -54,11 +57,11 @@ bool save_screenshot(string filename, int w, int h)
  
   if (!dataBuffer) return false;
  
-   // Let's fetch them from the backbuffer	
+   // Let's fetch them from the backbuffer  
    // We request the pixels in GL_BGR format, thanks to Berzeger for the tip
    glReadPixels((GLint)0, (GLint)0,
-		(GLint)w, (GLint)h,
-		 GL_BGR, GL_UNSIGNED_BYTE, dataBuffer);
+        (GLint)w, (GLint)h,
+         GL_BGR, GL_UNSIGNED_BYTE, dataBuffer);
  
    //Now the file creation
    FILE *filePtr = fopen(filename.c_str(), "wb");
@@ -67,13 +70,13 @@ bool save_screenshot(string filename, int w, int h)
  
    unsigned char TGAheader[12]={0,0,2,0,0,0,0,0,0,0,0,0};
    unsigned char header[6] = { w%256,w/256,
-			       h%256,h/256,
-			       24,0};
+                   h%256,h/256,
+                   24,0};
    // We write the headers
-   fwrite(TGAheader,	sizeof(unsigned char),	12,	filePtr);
-   fwrite(header,	sizeof(unsigned char),	6,	filePtr);
+   fwrite(TGAheader,    sizeof(unsigned char),  12, filePtr);
+   fwrite(header,   sizeof(unsigned char),  6,  filePtr);
    // And finally our image data
-   fwrite(dataBuffer,	sizeof(GLubyte),	nSize,	filePtr);
+   fwrite(dataBuffer,   sizeof(GLubyte),    nSize,  filePtr);
    fclose(filePtr);
  
    free(dataBuffer);
@@ -83,8 +86,8 @@ bool save_screenshot(string filename, int w, int h)
 
 void clear_screen()
 {
-	glClearColor(0.0, 0.0, 0.0, 0.0);
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
 vector<string> tokenize(string line) {
@@ -102,47 +105,47 @@ vector<string> tokenize(string line) {
 }
 
 void parse_global_params(vector<string> words) {
-	if (words[0] == GRD_DIM_STR) {
-		ground_dimension = stod(words[1]);
-		std::cout << GRD_DIM_STR << " " << ground_dimension << std::endl;
-	} else if (words[0] == NUM_ENT_STR) {
-		population_size = stoi(words[1]);
-		std::cout << NUM_ENT_STR << " " << population_size << std::endl;
-	} else if (words[0] == RAD_STR) {
-		radius = stod(words[1]);
-		std::cout << RAD_STR << " " << radius << std::endl;
-	} else if (words[0] == NUM_OBJ_STR) {
-		number_objectives = stoi(words[1]);
-		std::cout << NUM_OBJ_STR << " " << number_objectives << std::endl;
-	} else if (words[0] == OBJ_RAD_STR) {
-		objective_radius = stod(words[1]);
-		std::cout << OBJ_RAD_STR << " " << objective_radius << std::endl;
-	}
+    if (words[0] == GRD_DIM_STR) {
+        ground_dimension = stod(words[1]);
+        std::cout << GRD_DIM_STR << " " << ground_dimension << std::endl;
+    } else if (words[0] == NUM_ENT_STR) {
+        population_size = stoi(words[1]);
+        std::cout << NUM_ENT_STR << " " << population_size << std::endl;
+    } else if (words[0] == RAD_STR) {
+        radius = stod(words[1]);
+        std::cout << RAD_STR << " " << radius << std::endl;
+    } else if (words[0] == NUM_OBJ_STR) {
+        number_objectives = stoi(words[1]);
+        std::cout << NUM_OBJ_STR << " " << number_objectives << std::endl;
+    } else if (words[0] == OBJ_RAD_STR) {
+        objective_radius = stod(words[1]);
+        std::cout << OBJ_RAD_STR << " " << objective_radius << std::endl;
+    }
 }
 
 void draw_circle(bool isObj, double x, double y){
-	unsigned int count = 20;
+    unsigned int count = 20;
         GLfloat twicePi = 2.0f * M_PI;
-	double r = radius;
-	if (isObj) r = objective_radius;
+    double r = radius;
+    if (isObj) r = objective_radius;
 
-	glBegin(GL_TRIANGLE_FAN);
-		glVertex2f(x, y);
+    glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x, y);
 
                 for(unsigned int i = 0; i <= count; ++i) {
                         glVertex2f(x + (r * cos(i * twicePi / count)), y + (r * sin(i * twicePi / count)));
                 }
-	glEnd();
+    glEnd();
 }
 
 void render_log_function() {
-	clear_screen();
+    clear_screen();
         glOrtho(-ground_dimension, ground_dimension, -ground_dimension, ground_dimension, -ground_dimension, ground_dimension);
 
-	string line;
-	vector<string> words;
-	double x,y,r,g,b;
-	int id;
+    string line;
+    vector<string> words;
+    double x,y,r,g,b;
+    int id;
 
         while(getline(log_in, line)) {
                 words = tokenize(line);
@@ -165,13 +168,13 @@ void render_log_function() {
 
 void render_log(int *argcp, char **argv)
 {
-	string line;
-	for (int i = 0; i < 5; i++) {
-		getline(log_in, line);
-		parse_global_params(tokenize(line));
-	}
+    string line;
+    for (int i = 0; i < 5; i++) {
+        getline(log_in, line);
+        parse_global_params(tokenize(line));
+    }
 
-	/* init window */
+    /* init window */
         glutInit(argcp, argv);
         glutInitDisplayMode(GLUT_SINGLE);
         glutInitWindowSize(500, 500);
@@ -181,274 +184,279 @@ void render_log(int *argcp, char **argv)
         glutDisplayFunc(render_log_function);
         glutMainLoop();
 
-	return;
+    return;
 }
 
 void render_function()
 {
-	clear_screen();
-	glOrtho(-ground_dimension, ground_dimension, -ground_dimension, ground_dimension, -ground_dimension, ground_dimension);
-	
-	/* draw something */
-	unsigned long timestamp = 1;
+    clear_screen();
+    glOrtho(-ground_dimension, ground_dimension, -ground_dimension, ground_dimension, -ground_dimension, ground_dimension);
+    
+    /* draw something */
+    unsigned long timestamp = 1;
 
-	/* timing accumulators */
-	clock_t check;
-	double init_time = 0;
-	double draw_obj_time = 0;
-	double draw_entities_time = 0;
-	double sense_time = 0;
-	double decide_time = 0;
-	double move_prediction_time = 0;
-	double adjustment_time = 0;
-	double move_time = 0;
-	double draw_lines_time = 0;
-	double grid_time = 0;
-	double video_time = 0;
-	clock_t start = clock();
-	clock_t last_video = clock();
-	unsigned int video_ctr = 0;
+    /* timing accumulators */
+    clock_t check;
+    double init_time = 0;
+    double draw_obj_time = 0;
+    double draw_entities_time = 0;
+    double sense_time = 0;
+    double decide_time = 0;
+    double move_prediction_time = 0;
+    double adjustment_time = 0;
+    double move_time = 0;
+    double draw_lines_time = 0;
 
-	check = clock();
-	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
-	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
+    double grid_time = 0;
+    double video_time = 0;
+    clock_t start = clock();
+    clock_t last_video = clock();
+    unsigned int video_ctr = 0;
+
+
+    check = clock();
+    population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
+    init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
+
   
 #ifdef GPU
-	cout << "end of gpu version" << endl;
-	video_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
-	
+    cout << "end of gpu version" << endl;
+    video_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
+    
 #if 0
-	dim3 blocksPerGrid(ceil((population_size)/16.0), 1, 1);
-	dim3 threadsPerBlock(16, 1, 1);
-	double* d_position_x =  thrust::raw_pointer_cast(&test.position_x[0]);
-	double* d_position_y =  thrust::raw_pointer_cast(&test.position_y[0]);
-	char* d_bm =  thrust::raw_pointer_cast(&test.g_bm[0]);
-	device_print_something<<<blocksPerGrid,threadsPerBlock>>>(population_size, d_position_x, d_position_y, d_bm);
+    dim3 blocksPerGrid(ceil((population_size)/16.0), 1, 1);
+    dim3 threadsPerBlock(16, 1, 1);
+    double* d_position_x =  thrust::raw_pointer_cast(&test.position_x[0]);
+    double* d_position_y =  thrust::raw_pointer_cast(&test.position_y[0]);
+    char* d_bm =  thrust::raw_pointer_cast(&test.g_bm[0]);
+    device_print_something<<<blocksPerGrid,threadsPerBlock>>>(population_size, d_position_x, d_position_y, d_bm);
 #endif
-	cout << video_time << endl;
+    cout << video_time << endl;
 #endif
   
-	double r,g,b;
-	while(timestamp++){
-		/* Draw objectives, no AI here */
-		glColor3f(1.0, 0.0, 0.0);
-		r = 1.; g = 0.; b = 0.;
-		check = clock();
-		for(unsigned int i = 0; i < test.num_objs; ++i){
-			test.objectives[i]->draw(r,g,b);
-		}
-		draw_obj_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+    double r,g,b;
+    while(timestamp++){
+        /* Draw objectives, no AI here */
+        glColor3f(1.0, 0.0, 0.0);
+        r = 1.; g = 0.; b = 0.;
+        check = clock();
+        for(unsigned int i = 0; i < test.num_objs; ++i){
+            test.objectives[i]->draw(r,g,b);
+        }
+        draw_obj_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
-		/* AI Loop: Perception -> Decision -> Action */
-		/* Preception */
+        /* AI Loop: Perception -> Decision -> Action */
+        /* Preception */
 
-		check = clock();
-		test.sense(sense_dist);		
-		sense_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+        check = clock();
+        test.sense(sense_dist);     
+        sense_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
-		/* Decision */
+        /* Decision */
 
-		check = clock();
-		test.decide(sense_dist);
-		decide_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+        check = clock();
+        test.decide(sense_dist);
+        decide_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
-		/* Action */
-		/* TODO: GPU version */
-		check = clock();
-		for(unsigned int i = 0; i < test.pop_size; ++i){
-			if (test.entities[i].status == LINK) {
-				if (test.entities[i].link->branch) {
-					glColor3f(0.0, 1.0, 0.5);
-					r = 0.; g = 1.; b = .5;
-				} else {
-					glColor3f(0.0, 1.0, 0.0);
-					r = 0.; g = 1.; b = 0.;
-				}
-			} else if (test.entities[i].status == PATH) {
-				glColor3f(.5, 0.0, .5);
-				r = .5; g = 0.; b = .5;
-			} else {
-				glColor3f(0.0, 0.0, 1.0);
-				r = 0.; g = 0.; b = 1.;
-			}
+        /* Action */
+        /* TODO: GPU version */
+        check = clock();
+        for(unsigned int i = 0; i < test.pop_size; ++i){
+            if (test.entities[i].status == LINK) {
+                if (test.entities[i].link->branch) {
+                    glColor3f(0.0, 1.0, 0.5);
+                    r = 0.; g = 1.; b = .5;
+                } else {
+                    glColor3f(0.0, 1.0, 0.0);
+                    r = 0.; g = 1.; b = 0.;
+                }
+            } else if (test.entities[i].status == PATH) {
+                glColor3f(.5, 0.0, .5);
+                r = .5; g = 0.; b = .5;
+            } else {
+                glColor3f(0.0, 0.0, 1.0);
+                r = 0.; g = 0.; b = 1.;
+            }
 
-			test.entities[i].draw(r,g,b);
-		}
-		draw_entities_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+            test.entities[i].draw(r,g,b);
+        }
+        draw_entities_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
-		check = clock();
-		for(unsigned int i = 0; i < test.pop_size; ++i){
-			test.entities[i].move_prediction();
-		}
-		move_prediction_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+        check = clock();
+        for(unsigned int i = 0; i < test.pop_size; ++i){
+            test.entities[i].move_prediction();
+        }
+        move_prediction_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
-		check = clock();
-		test.adjustment();
-		adjustment_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
-		
-		/* TODO: GPU version */
-		check = clock();
-		#ifdef GPU
-			test.advance_robot();
+        check = clock();
+        test.adjustment();
+        adjustment_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+        
+        /* TODO: GPU version */
+        check = clock();
+        
+        #ifdef GPU
+        test.advance_robot();
         #else
-            for(unsigned int i = 0; i < test.pop_size; ++i){
+        for(unsigned int i = 0; i < test.pop_size; ++i){
                 test.entities[i].move();
             }
-		#endif
-		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+        #endif
+        move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
-		check = clock();
-		test.clear_grid();
-		test.assign_to_grid();
-		grid_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+        check = clock();
+        test.clear_grid();
+        test.assign_to_grid();
+        grid_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
-		/* for leftmost mode, check if all entities reach the rightmost */
-		if(mode == LEFTMOST_INIT && test.terminate()){
-			break;
-		}
+        /* for leftmost mode, check if all entities reach the rightmost */
+        if(mode == LEFTMOST_INIT && test.terminate()){
+            break;
+        }
 
-		check = clock();
-		/* Draw lines to better visualize what nodes are doing */
-		for(unsigned int i = 0; i < test.pop_size; ++i){
-			if (test.entities[i].status == LINK || test.entities[i].status == PATH) {
-				if (test.entities[i].status == LINK)
-					glColor3f(0.0, 0.5, 0.0);
-				else
-					glColor3f(0.25, 0.0, 0.25);
-				glBegin(GL_LINES);
-					vector<double> B_pos = test.entities[i].link->previous->node->pos;
-					glVertex2f(test.entities[i].pos[0], test.entities[i].pos[1]);
-					glVertex2f(B_pos[0], B_pos[1]);
-				glEnd();
-			}
-		}
-		draw_lines_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;	
+        check = clock();
+        /* Draw lines to better visualize what nodes are doing */
+        for(unsigned int i = 0; i < test.pop_size; ++i){
+            if (test.entities[i].status == LINK || test.entities[i].status == PATH) {
+                if (test.entities[i].status == LINK)
+                    glColor3f(0.0, 0.5, 0.0);
+                else
+                    glColor3f(0.25, 0.0, 0.25);
+                glBegin(GL_LINES);
+                    vector<double> B_pos = test.entities[i].link->previous->node->pos;
+                    glVertex2f(test.entities[i].pos[0], test.entities[i].pos[1]);
+                    glVertex2f(B_pos[0], B_pos[1]);
+                glEnd();
+            }
+        }
+        draw_lines_time += ((double)(clock() - check))/ CLOCKS_PER_SEC; 
 
-		double total_time = ((double)(clock() - start))/ CLOCKS_PER_SEC;
-		if (total_time >= max_time) {
-			double unaccounted = total_time;
-			unaccounted -= init_time + draw_obj_time + draw_entities_time + sense_time;
-			unaccounted -= decide_time + move_prediction_time + adjustment_time;
-			unaccounted -= move_time + draw_lines_time;
+        double total_time = ((double)(clock() - start))/ CLOCKS_PER_SEC;
+        if (total_time >= max_time) {
+            double unaccounted = total_time;
+            unaccounted -= init_time + draw_obj_time + draw_entities_time + sense_time;
+            unaccounted -= decide_time + move_prediction_time + adjustment_time;
+            unaccounted -= move_time + draw_lines_time;
 
-			std::cout << "Ran for " << total_time << " seconds." << std::endl;
-			std::cout << "Timing breakdown\n--------------------" << std::endl;
-			printf("\tInitialization: %.2f%%\n", (init_time/total_time)*100.);
-			printf("\tDrawing objectives: %.2f%%\n", (draw_obj_time/total_time)*100.);
-			printf("\tDrawing entities: %.2f%%\n", (draw_entities_time/total_time)*100.);
-			printf("\tSensing: %.2f%%\n", (sense_time/total_time)*100.);
-			printf("\tDeciding: %.2f%%\n", (decide_time/total_time)*100.);
-			printf("\tPredicting moves: %.2f%%\n", (move_prediction_time/total_time)*100.);
-			printf("\tAdjustments: %.2f%%\n", (adjustment_time/total_time)*100.);
-			printf("\tMoving: %.2f%%\n", (move_time/total_time)*100.);
-			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
-			printf("\tMaintaining grid: %.2f%%\n", (grid_time/total_time)*100.);
-			printf("\tRendering video: %.2f%%\n", (video_time/total_time)*100.);
-			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
-			std::cout << "\nNumber of updates: " << timestamp-1 << std::endl;
-			save_screenshot("out.tga", 500, 500);
+            std::cout << "Ran for " << total_time << " seconds." << std::endl;
+            std::cout << "Timing breakdown\n--------------------" << std::endl;
+            printf("\tInitialization: %.2f%%\n", (init_time/total_time)*100.);
+            printf("\tDrawing objectives: %.2f%%\n", (draw_obj_time/total_time)*100.);
+            printf("\tDrawing entities: %.2f%%\n", (draw_entities_time/total_time)*100.);
+            printf("\tSensing: %.2f%%\n", (sense_time/total_time)*100.);
+            printf("\tDeciding: %.2f%%\n", (decide_time/total_time)*100.);
+            printf("\tPredicting moves: %.2f%%\n", (move_prediction_time/total_time)*100.);
+            printf("\tAdjustments: %.2f%%\n", (adjustment_time/total_time)*100.);
+            printf("\tMoving: %.2f%%\n", (move_time/total_time)*100.);
+            printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
+            printf("\tMaintaining grid: %.2f%%\n", (grid_time/total_time)*100.);
+            printf("\tRendering video: %.2f%%\n", (video_time/total_time)*100.);
+            printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
+            std::cout << "\nNumber of updates: " << timestamp-1 << std::endl;
+
+            save_screenshot("out.tga", 500, 500);
 #ifdef GPU
-			log_file.close();
+            log_file.close();
 #endif
-			exit(0);
-		}
-		
-		check = clock();
-		double time_since_last_screen = ((double)(clock() - last_video))/ CLOCKS_PER_SEC;
-		if (time_since_last_screen > 0.025) {
-			save_screenshot("./video/"  + std::to_string(video_ctr) + ".tga", 500, 500);
-			video_ctr++;
-			last_video = clock();
-		}
-		video_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
-		
+            exit(0);
+        }
+        
+        check = clock();
+        double time_since_last_screen = ((double)(clock() - last_video))/ CLOCKS_PER_SEC;
+        if (time_since_last_screen > 0.025) {
+            save_screenshot("./video/"  + std::to_string(video_ctr) + ".tga", 500, 500);
+            video_ctr++;
+            last_video = clock();
+        }
+        video_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+        
 
-		glFlush();
-		clear_screen();
-		log_file << CLR_STR << std::endl;
-	}
+        glFlush();
+        clear_screen();
+        log_file << CLR_STR << std::endl;
+    }
 
-	glFlush();
+    glFlush();
 }
 
 int main(int argc, char* argv[])
 {
-	/* parse arguments */
-	int opt;
-	if(argc == 1){
-		std::cout << "Usage: ./simulator -mode [population size] "
-			  << "[radius of individual: default is set to 20] "
-			  << "[dimension of the playground: default is set to 1000]" 
-			  << "[number of objectives: default is 2] "
-			  << "[radius of objectives: default is 100] "
-			  << "[max time: in seconds, default is 300] "
-			  << std::endl;
-		std::cout << "Example: ./simulator 10" << std::endl;
-		std::cout << "         ./simulator 50 50 2000 " << std::endl;
-		std::cout << "         ./simulator 100 20 1000 2 100 300" << std::endl;
-		std::cout << "Note: exit the program by entering Ctrl^C from the terminal" << std::endl;
-		std::cout << "Mode: -r randomly initialized without targets" << std::endl;
-		std::cout << "      -t robots start from the leftmost edge moving to the rightmost edge" << std::endl;
-		return 0;
-	}
+    /* parse arguments */
+    int opt;
+    if(argc == 1){
+        std::cout << "Usage: ./simulator -mode [population size] "
+              << "[radius of individual: default is set to 20] "
+              << "[dimension of the playground: default is set to 1000]" 
+              << "[number of objectives: default is 2] "
+              << "[radius of objectives: default is 100] "
+              << "[max time: in seconds, default is 300] "
+              << std::endl;
+        std::cout << "Example: ./simulator 10" << std::endl;
+        std::cout << "         ./simulator 50 50 2000 " << std::endl;
+        std::cout << "         ./simulator 100 20 1000 2 100 300" << std::endl;
+        std::cout << "Note: exit the program by entering Ctrl^C from the terminal" << std::endl;
+        std::cout << "Mode: -r randomly initialized without targets" << std::endl;
+        std::cout << "      -t robots start from the leftmost edge moving to the rightmost edge" << std::endl;
+        return 0;
+    }
 
-	while((opt = getopt(argc, argv, "lrt")) != -1)
-	{
-		switch(opt)
-		{
-			case 'l':
-				render_log(&argc, argv);
-				exit(0);
-			case 'r':
-				mode = RANDOM_INIT;
-				break;
-			case 't':
-				mode = LEFTMOST_INIT;
-				break;
-			case '?':
-				std::cout << "Unknown option: " << optopt << std::endl;
-				return 0;
-				break;
-		}
-	}
+    while((opt = getopt(argc, argv, "lrt")) != -1)
+    {
+        switch(opt)
+        {
+            case 'l':
+                render_log(&argc, argv);
+                exit(0);
+            case 'r':
+                mode = RANDOM_INIT;
+                break;
+            case 't':
+                mode = LEFTMOST_INIT;
+                break;
+            case '?':
+                std::cout << "Unknown option: " << optopt << std::endl;
+                return 0;
+                break;
+        }
+    }
 
-	if(optind < argc){
-		population_size = atoi(argv[optind++]);
-	}
-	if(optind < argc){
-		radius = atof(argv[optind++]);
-	}
-	if(optind < argc){
-		ground_dimension = atof(argv[optind++]);
-	}
-	if (optind < argc){
-		number_objectives = atoi(argv[optind++]);
-	}
-	if (optind < argc){
-		objective_radius = atof(argv[optind++]);
-	}
-	if (optind < argc){
-		max_time = atoi(argv[optind++]);
-	}
+    if(optind < argc){
+        population_size = atoi(argv[optind++]);
+    }
+    if(optind < argc){
+        radius = atof(argv[optind++]);
+    }
+    if(optind < argc){
+        ground_dimension = atof(argv[optind++]);
+    }
+    if (optind < argc){
+        number_objectives = atoi(argv[optind++]);
+    }
+    if (optind < argc){
+        objective_radius = atof(argv[optind++]);
+    }
+    if (optind < argc){
+        max_time = atoi(argv[optind++]);
+    }
 
-	log_file << GRD_DIM_STR << "\t" << std::to_string(ground_dimension) << std::endl
-		<< NUM_ENT_STR << "\t" << std::to_string(population_size) << std::endl
-		<< RAD_STR << "\t" << std::to_string(radius) << std::endl
-		<< NUM_OBJ_STR << "\t" << std::to_string(number_objectives) << std::endl
-		<< OBJ_RAD_STR << "\t" << std::to_string(radius) << std::endl;
+    log_file << GRD_DIM_STR << "\t" << std::to_string(ground_dimension) << std::endl
+        << NUM_ENT_STR << "\t" << std::to_string(population_size) << std::endl
+        << RAD_STR << "\t" << std::to_string(radius) << std::endl
+        << NUM_OBJ_STR << "\t" << std::to_string(number_objectives) << std::endl
+        << OBJ_RAD_STR << "\t" << std::to_string(radius) << std::endl;
 
 #ifdef GPU
-	render_function();
+    render_function();
 #else
-	/* init window */
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_SINGLE);
-	glutInitWindowSize(500, 500);
-	glutInitWindowPosition(100, 100);
-	glutCreateWindow("Robots simulator demo");
-	/* display */
-	glutDisplayFunc(render_function);
-	glutMainLoop();
+    /* init window */
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE);
+    glutInitWindowSize(500, 500);
+    glutInitWindowPosition(100, 100);
+    glutCreateWindow("Robots simulator demo");
+    /* display */
+    glutDisplayFunc(render_function);
+    glutMainLoop();
 #endif
-	return 0;
+    return 0;
 }
