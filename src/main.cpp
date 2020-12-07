@@ -387,6 +387,7 @@ void log_simulation()
 			exit(0);
 		} else if (total_time >= last_status + status_freq) {
 			std::cout << total_time << "s has passed" << std::endl;
+			std::cout << done_count << " entities are done" << std::endl;
 			last_status = total_time;
 		}
 

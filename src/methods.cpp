@@ -335,7 +335,7 @@ void population::decide_link_objective(double sense_dist)
 				continue;
 			}
 			/* Otherwise this entity is now in a linked_tree */
-			std::cout << "Entity " << i << " is linking with objective " << obj_tmp->id << std::endl;
+			//std::cout << "Entity " << i << " is linking with objective " << obj_tmp->id << std::endl;
 			this->entities[i].status = LINK;
 			this->entities[i].velocity = vector<double>(this->dim, 0);
 			this->entities[i].link = new linked_tree(obj_tmp->link->root, obj_tmp->link, &(this->entities[i]));
@@ -375,7 +375,7 @@ void population::decide_link_entity(double sense_dist)
 				this->entities[i].status = RUNNING;
 				continue;
 			}
-			std::cout << "Entity " << i << " is linking with entity " << k_actual << std::endl;
+			//std::cout << "Entity " << i << " is linking with entity " << k_actual << std::endl;
 			/* Entity is within sensing distance of a linked entity, so create another link */
 			//another_tmp->link->free = false;
 			this->entities[i].status = LINK;
@@ -544,7 +544,7 @@ void population::form_path(individual *linked1, individual *linked2, individual 
 	finder->status = PATH;
 	finder->velocity = vector<double>(this->dim, 0);
 	finder->link = new linked_tree(linked1->link->root, linked1->link, finder);
-	std::cout << "FOUND A PATH" << std::endl;
+	//std::cout << "FOUND A PATH" << std::endl;
 }
 
 
