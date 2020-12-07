@@ -55,6 +55,23 @@ __global__ void move_kernel(double *position_x, double *position_y, double *posi
 	  position_next_y[index] = position_y[index];
      // printf("%d, %f %f\n", index, position_x[index], position_y[index]);
 }
+
+__global__ void move_prediction_kernel(double *position_next_x, double *position_next_y, double *velocity_x, double *velocity_y, int pop_size, double limit)
+{
+	unsigned int index = blockDim.x * blockIdx.x + threadIdx.x;
+	if (index >= pop_size) return;
+
+	double tmp = position_next_x[index] + velocity_x[index];
+	if(tmp > limit || tmp < -limit){
+		velocity_x[index] = -velocity_x[index];
+	}
+	tmp = position_next_y[index] + velocity_y[index];
+	if(tmp > limit || tmp < -limit){
+	    velocity_y[index] = -velocity_y[index];
+	}
+	position_next_x[index] += velocity_x[index];
+	position_next_y[index] += velocity_y[index];
+}
 #endif
 
 linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
@@ -216,7 +233,7 @@ bool individual::_move(vector<double>& pos)
 	return res;
 }
 
-/* movement with respect to veclocity */
+/* movement with respect to velocity */
 void individual::move()
 {
 	if(this->status == STOP){
@@ -538,8 +555,8 @@ void collision_kernel(unsigned int pop_size, double radius, char* res, double* p
     if (i >= pop_size) return;
 
 #if 0	
-	dim3 blocksPerGrid(ceil((pop_size)/16.0), 1, 1);
-	dim3 threadsPerBlock(16, 1, 1);
+	dim3 blocksPerGrid(ceil((pop_size)/10.0), 1, 1);
+	dim3 threadsPerBlock(10, 1, 1);
 
 	inner_collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(pop_size, radius, i, res, pos_x, pos_y, d_bm);
 #endif
@@ -583,8 +600,8 @@ bool population::collision()
 	/* TODO: make it supports GPU */
 
 #ifdef GPU
-	double* d_position_x =  thrust::raw_pointer_cast(&position_x[0]);
-	double* d_position_y =  thrust::raw_pointer_cast(&position_y[0]);
+	double* d_position_x =  thrust::raw_pointer_cast(&position_next_x[0]);
+	double* d_position_y =  thrust::raw_pointer_cast(&position_next_y[0]);
 	char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
 	char* d_res;
 	cudaError_t err = cudaMallocManaged((void **) &d_res, 1);
@@ -595,12 +612,18 @@ bool population::collision()
 	}
 	*d_res = 0;
 
-	dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
-	dim3 threadsPerBlock(16, 1, 1);
+	dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+	dim3 threadsPerBlock(10, 1, 1);
 
 	collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, this->entities[0].radius, d_res, d_position_x, d_position_y, d_bm);
 	cudaDeviceSynchronize();
 	res = *d_res ? true : res;
+	cudaFree(d_res);
+	
+	/* FIXME: copy device back to host, shouldn't do that for final product */
+	for(unsigned int i = 0; i < this->pop_size + this->num_objs; ++i){
+		this->bm[i].bit = g_bm[i];
+	}
 
 #else
 	// Loop through each entity
@@ -656,8 +679,8 @@ bool population::init_collision()
 	cudaStreamCreate(&streams[0]);
 	cudaStreamCreate(&streams[1]);
 
-	dim3 blocksPerGrid(ceil(pop_size/16.0), 1, 1);
-	dim3 threadsPerBlock(16, 1, 1);
+	dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+	dim3 threadsPerBlock(10, 1, 1);
 
 	// between entities
 	collision_kernel<<<blocksPerGrid,threadsPerBlock, 0, streams[0]>>>(this->pop_size, this->entities[0].radius, d_res, d_position_x, d_position_y, d_bm);
@@ -714,7 +737,7 @@ void population::adjustment()
 	unsigned int retries = 0;
 
 	/* retries 2 times because we only have 2 directions to go at the moment */
-	while(collision() && retries < 2){
+	while(collision() && retries++ < 2){
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < this->pop_size; ++i){
 			if(this->bm[i].bit){
@@ -728,15 +751,34 @@ void population::adjustment()
 				}
 
 				this->entities[i].move_prediction();
+				
+				/* FIXME: copy host back to device, shouldn't do that for final product */
+#if GPU
+				this->g_bm[i] = 0;
+				this->velocity_x[i] = this->entities[i].velocity[0];
+				this->position_next_x[i] = this->entities[i].pos[0];
+				this->velocity_y[i] = this->entities[i].velocity[1];
+				this->position_next_y[i] = this->entities[i].pos[1];
+#endif
 			}
 		}
 	}
 
 	/* collision still exists, stop the entities detected collision */
-	while(collision()){
+	retries = 0;
+	while(collision() && retries < 2){
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < this->pop_size; ++i){
 			if(this->bm[i].bit){
+				
+				/* FIXME: copy host back to device, shouldn't do that for final product */
+#if GPU
+				this->g_bm[i] = 0;
+				this->position_next_x[i] = this->entities[i].pos[0];
+				this->position_next_y[i] = this->entities[i].pos[1];
+				int tmp = (int)STOP;
+				this->g_status[i] = tmp;
+#endif
 				this->bm[i].bit = 0;
 				this->entities[i].status = STOP;
 				/* reset pos_next */
@@ -745,6 +787,16 @@ void population::adjustment()
 				}
 			}
 		}
+	}
+	
+	if(retries == 2){
+		std:: cout << "No room for that much(big) entities! "
+			   << "Program exit at this point because collision between entities could not be solved "
+			   << "Please revise your arguments by "
+			   << "decresing the [population size], [radius of entity] "
+			   << "or incresing the [playground dimension]" 
+			   << endl;
+		exit(1);
 	}
 }
 
@@ -964,15 +1016,50 @@ void population::advance_robot()
   cudaDeviceSynchronize();
 
   for (unsigned int i = 0; i < this->pop_size; ++i){
-  	this->entities[i].pos[0] = position_x[i];
+  	double tmp1 = this->entities[i].pos[0];
+	double tmp2 = this->entities[i].pos[1];
+	this->entities[i].pos[0] = position_x[i];
   	this->entities[i].pos[1] = position_y[i];
   	this->entities[i].pos_next[0] = position_next_x[i];
   	this->entities[i].pos_next[1] = position_next_y[i];
   	this->entities[i].velocity[0] = velocity_x[i];
   	this->entities[i].velocity[1] = velocity_y[i];
-  	if (g_status[i] == 1) {this->entities[i].status = STOP;}
-  	else if (g_status[i] == 2) {this->entities[i].status = READY;}
-  	else if (g_status[i] == 3) {this->entities[i].status = RUNNING;}
+	int tmp = g_status[i];
+	this->entities[i].status = static_cast<states>(tmp);
+	this->bm[i].bit = g_bm[i];
+  }
+
+}
+
+void population::predict_robot()
+{
+  for (unsigned int i = 0; i < this->pop_size; ++i){
+  	position_x[i] = this->entities[i].pos[0];
+  	position_y[i] = this->entities[i].pos[1];
+  	position_next_x[i] = this->entities[i].pos_next[0];
+  	position_next_y[i] = this->entities[i].pos_next[1];
+  	velocity_x[i] = this->entities[i].velocity[0];
+  	velocity_y[i] = this->entities[i].velocity[1];
+	g_status[i] = (int)this->entities[i].status;
+	g_bm[i] = this->bm[i].bit;
+  }
+  
+  double* d_position_next_x = thrust::raw_pointer_cast(&position_next_x[0]);
+  double* d_position_next_y = thrust::raw_pointer_cast(&position_next_y[0]);
+  double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
+  double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
+
+  dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+  dim3 threadsPerBlock(10, 1, 1);
+
+  move_prediction_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_next_x, d_position_next_y, d_velocity_x, d_velocity_y, pop_size, this->limit);
+  cudaDeviceSynchronize();
+
+  for (unsigned int i = 0; i < this->pop_size; ++i){
+  	this->entities[i].pos_next[0] = position_next_x[i];
+  	this->entities[i].pos_next[1] = position_next_y[i];
+  	this->entities[i].velocity[0] = velocity_x[i];
+  	this->entities[i].velocity[1] = velocity_y[i];
   }
 
 }

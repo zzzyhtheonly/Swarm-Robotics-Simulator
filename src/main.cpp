@@ -28,12 +28,10 @@ unsigned int max_time = 300;
 
 /* those are fixed at the moment */
 unsigned int dimension_size = 2;
-#ifdef GPU
+
 ofstream log_file("log.txt");
-#endif
 
-ifstream log_in("log2.txt");
-
+#ifdef GPU
 __global__
 void device_print_something(unsigned int pop_size, double* pos_x, double* pos_y, char* bm)
 {
@@ -42,7 +40,9 @@ void device_print_something(unsigned int pop_size, double* pos_x, double* pos_y,
 	
 	printf("%f %f\n", pos_x[i], pos_y[i]);
 }
+#endif
 
+ifstream log_in("log2.txt");
 
 // Source: http://www.david-amador.com/2012/09/how-to-take-screenshot-in-opengl/
 bool save_screenshot(string filename, int w, int h)
@@ -232,7 +232,7 @@ void render_function()
 	device_print_something<<<blocksPerGrid,threadsPerBlock>>>(population_size, d_position_x, d_position_y, d_bm);
 #endif
 	cout << video_time << endl;
-	return;
+	//return;
 #endif
   
 	double r,g,b;
@@ -284,6 +284,9 @@ void render_function()
 		draw_entities_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		check = clock();
+#if 0
+		test.predict_robot();
+#endif
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].move_prediction();
 		}
@@ -295,14 +298,12 @@ void render_function()
 		
 		/* TODO: GPU version */
 		check = clock();
-		
-		#ifdef GPU
+#if 0
 		test.advance_robot();
-        #else
+#endif
         for(unsigned int i = 0; i < test.pop_size; ++i){
                 test.entities[i].move();
-            }
-		#endif
+		}
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		check = clock();

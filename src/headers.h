@@ -191,6 +191,7 @@ public:
 	
 	void birth_robot();       // pushes back one more robot data to the device_vectors
     void advance_robot();    // launches the move that adds velocity to positions
+	void predict_robot();
 	bool g_if_collision(unsigned int, unsigned int, bool, bool, double, double);
 #endif
 
