@@ -274,8 +274,8 @@ void population::sense_entities(double sense_dist)
 			this->entities[i].status == LINK ||
 			this->entities[i].status == PATH)
 			continue;
-		for (unsigned int j = 0; j < this->pop_size; j++) {
-			if (i == j) continue;
+		for (unsigned int j = i+1; j < this->pop_size; j++) {
+			//if (i == j) continue;
 			if (this->entities[i].if_sense(this->entities[j], sense_dist) && 
 				this->entities[j].status == LINK) {
 				//std::cout << "Entity " << i << " sensed entity " << j << std::endl;
@@ -372,9 +372,9 @@ bool population::collision()
 
 	// Loop through each entity
 	for(unsigned int i = 0; i < this->pop_size; ++i){
-		for (unsigned int j = 0; j < this->pop_size; ++j) {
+		for (unsigned int j = i+1; j < this->pop_size; ++j) {
 			// Check if "comparing to self"
-			if (i == j) continue;
+			//if (i == j) continue;
 			// If colliding with another, then do collision behavior
 			if (this->entities[i].if_collision(this->entities[j])) {
 				this->bm[i].bit=1;
