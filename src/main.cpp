@@ -258,10 +258,10 @@ void log_simulation()
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		//cout << "GRID" << endl;
-		check = clock();
-		test.clear_grid();
-		test.assign_to_grid();
-		grid_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
+		//check = clock();
+		//test.clear_grid();
+		//test.assign_to_grid();
+		//grid_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		/* for leftmost mode, check if all entities reach the rightmost */
 		if(mode == LEFTMOST_INIT && test.terminate()){
@@ -341,7 +341,7 @@ void log_simulation()
 			printf("\tAdjustments: %.2f%%\n", (adjustment_time/total_time)*100.);
 			printf("\tMoving: %.2f%%\n", (move_time/total_time)*100.);
 			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
-			printf("\tMaintaining grid: %.2f%%\n", (grid_time/total_time)*100.);
+			//printf("\tMaintaining grid: %.2f%%\n", (grid_time/total_time)*100.);
 			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
 
 			/* Final draw for objectives */

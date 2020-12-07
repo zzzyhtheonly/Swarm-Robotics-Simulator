@@ -265,12 +265,6 @@ void population::sense_objectives(double sense_dist)
 within a path) within sensing distance of at least one other linked entity? */
 void population::sense_entities(double sense_dist)
 {	
-
-	unsigned int left_x, right_x, up_y, down_y;
-	double l = this->dim_limit;
-	double c = this->cell_size;
-	double s = sense_dist + this->entities[0].radius*2;
-
 	/* TODO: make it supports GPU */
 
 	// Loop through each entity
@@ -280,27 +274,12 @@ void population::sense_entities(double sense_dist)
 			this->entities[i].status == LINK ||
 			this->entities[i].status == PATH)
 			continue;
-		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
-		left_x = max(0, (int)(((this->entities[i].pos[0]+l)-s)/c));
-		right_x = min((int)this->grid_size-1, (int)(((this->entities[i].pos[0]+l)+s)/c));
-		down_y = max(0, (int)(((this->entities[i].pos[1]+l)-s)/c));
-		up_y = min((int)this->grid_size-1, (int)(((this->entities[i].pos[1]+l)+s)/c));
-		// Compare current entity to all other entities in current/adjacent cells
-		for (unsigned int x = left_x; x <= right_x; x++) {
-			for (unsigned int y = down_y; y <= up_y; y++) {
-				// Iterate through all entities in comparison cell
-				for (unsigned int k = 0; k < this->grid[x][y].size(); k++) {
-					// j = index of comparison entity (index in this->entities)
-					unsigned int j = this->grid[x][y][k];
-					// Check if "sensing self"
-					if (i == j) continue;
-					//cout << i << " | " << j << endl;
-					if (this->entities[i].if_sense(this->entities[j], sense_dist) && 
-						this->entities[j].status == LINK) {
-						//std::cout << "Entity " << i << " sensed entity " << j << std::endl;
-						this->entities[i].status = SENSE;
-					}
-				}
+		for (unsigned int j = 0; j < this->pop_size; j++) {
+			if (i == j) continue;
+			if (this->entities[i].if_sense(this->entities[j], sense_dist) && 
+				this->entities[j].status == LINK) {
+				//std::cout << "Entity " << i << " sensed entity " << j << std::endl;
+				this->entities[i].status = SENSE;
 			}
 		}
 	}
@@ -389,37 +368,19 @@ void population::decide_link_entity(double sense_dist)
 	comparisons are only made to nearby entities */
 bool population::collision()
 {
-
 	bool res = false;
-	unsigned int left_x, right_x, up_y, down_y;
-	double l = this->dim_limit;
-	double c = this->cell_size;
-	double r = this->entities[0].radius*2;
 
 	// Loop through each entity
 	for(unsigned int i = 0; i < this->pop_size; ++i){
-		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
-		left_x = max(0, (int)((this->entities[i].pos[0]+l-r)/c));
-		right_x = min((int)this->grid_size-1, (int)((this->entities[i].pos[0]+l+r)/c));
-		down_y = max(0, (int)((this->entities[i].pos[1]+l-r)/c));
-		up_y = min((int)this->grid_size-1, (int)((this->entities[i].pos[1]+l+r)/c));
-		// Compare current entity to all other entities in current/adjacent cells
-		for (unsigned int x = left_x; x <= right_x; x++) {
-			for (unsigned int y = down_y; y <= up_y; y++) {
-				// Iterate through all entities in comparison cell
-				for (unsigned int k = 0; k < this->grid[x][y].size(); k++) {
-					// j = index of comparison entity (index in this->entities)
-					unsigned int j = this->grid[x][y][k];
-					// Check if "comparing to self"
-					if (i == j) continue;
-					// If colliding with another, then do collision behavior
-					if (this->entities[i].if_collision(this->entities[j])) {
-						this->bm[i].bit=1;
-						this->bm[j].bit=1;
-						res = true;
-					}
-				}
-			}
+		for (unsigned int j = 0; j < this->pop_size; ++j) {
+			// Check if "comparing to self"
+			if (i == j) continue;
+			// If colliding with another, then do collision behavior
+			if (this->entities[i].if_collision(this->entities[j])) {
+				this->bm[i].bit=1;
+				this->bm[j].bit=1;
+				res = true;
+			}	
 		}
 	}
 
@@ -429,8 +390,8 @@ bool population::collision()
 /* customized collsion test only used after initialization */
 bool population::init_collision()
 {
-	bool res = collision();
-	/*
+	//bool res = collision();
+	
 	bool res = false;
 	// between entities
 	for(unsigned int i = 0; i < this->pop_size; ++i){
@@ -441,7 +402,7 @@ bool population::init_collision()
 				res = true;
 			}
 		}
-	}*/
+	}
 
 	// between objects
 	for(unsigned int i = 0; i < this->num_objs; ++i){
@@ -603,9 +564,9 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		this->bm.push_back(one_bit());
 	}
 
-        this->init_grid(radius, limit);
-        this->clear_grid();
-        this->assign_to_grid();
+        //this->init_grid(radius, limit);
+        //this->clear_grid();
+        //this->assign_to_grid();
 
 	unsigned int retries = 0;
 	/* make sure the population is initialized with no collision, give a retry limitation to prevent forever loop */
@@ -625,8 +586,8 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 				this->objectives[i] = new objective(dimension, objective_radius, limit, i);
 			}
 		}
-		this->clear_grid();
-		this->assign_to_grid();
+		//this->clear_grid();
+		//this->assign_to_grid();
 	}
 
 	if(retries == 100){
