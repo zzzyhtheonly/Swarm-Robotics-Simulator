@@ -284,12 +284,13 @@ void render_function()
 		draw_entities_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		check = clock();
-#if 0
+#ifdef GPU
 		test.predict_robot();
-#endif
+#else
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			test.entities[i].move_prediction();
 		}
+#endif
 		move_prediction_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		check = clock();
@@ -298,17 +299,20 @@ void render_function()
 		
 		/* TODO: GPU version */
 		check = clock();
-#if 0
+#ifdef GPU
 		test.advance_robot();
-#endif
+#else
         for(unsigned int i = 0; i < test.pop_size; ++i){
                 test.entities[i].move();
 		}
+#endif
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		check = clock();
+#ifndef GPU
 		test.clear_grid();
 		test.assign_to_grid();
+#endif
 		grid_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		/* for leftmost mode, check if all entities reach the rightmost */
@@ -317,6 +321,7 @@ void render_function()
 		}
 
 		check = clock();
+#ifndef GPU
 		/* Draw lines to better visualize what nodes are doing */
 		for(unsigned int i = 0; i < test.pop_size; ++i){
 			if (test.entities[i].status == LINK || test.entities[i].status == PATH) {
@@ -331,6 +336,7 @@ void render_function()
 				glEnd();
 			}
 		}
+#endif
 		draw_lines_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;	
 
 		double total_time = ((double)(clock() - start))/ CLOCKS_PER_SEC;

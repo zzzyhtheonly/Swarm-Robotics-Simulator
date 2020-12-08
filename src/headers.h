@@ -60,6 +60,18 @@ enum states
 	BRANCH,
 };
 
+#ifdef GPU
+#define	G_TERMINATE 0
+#define	G_STOP 1
+#define	G_READY 2 
+#define G_RUNNING 3
+#define G_ON_OBJ 4
+#define	G_LINK 5
+#define G_SENSE 6
+#define G_PATH 7
+#define G_BRANCH 8
+#endif
+
 /* Made this a global variable so main.cpp can set it at runtime. Maybe better way to do this? */
 extern unsigned int branch_len;
 
@@ -84,6 +96,29 @@ public:
 	linked_tree(objective *r, linked_tree *p, drawable *n);
 };
 
+#ifdef GPU
+__device__ __host__
+struct g_linked_tree
+{
+	/* using int says -1 as NULL */
+	int id;
+	
+	int root;
+	
+	int previous;
+	
+	unsigned int end = 0;
+	
+	int node;
+	
+	unsigned int branch_dist;
+	
+	unsigned char branch = 0;
+	
+	__device__ __host__  g_linked_tree(int id, int r, int n);
+};
+#endif
+
 class drawable
 {
 public:
@@ -104,6 +139,9 @@ public:
 
 	/* Assume any drawable can be placed in a linked tree, for now */
 	linked_tree *link;
+#ifdef GPU
+	unsigned int g_link;
+#endif
 
 	/* construct functions */
 	drawable() = delete;
@@ -187,7 +225,13 @@ public:
 
     thrust::device_vector<int> g_status;
 	thrust::device_vector<char> g_bm;
+	
+	thrust::device_vector<struct g_linked_tree> g_trees;
+	thrust::device_vector<int> g_trees_next;
+	
 	double limit;
+	
+	unsigned int total_size;
 	
 	void birth_robot();       // pushes back one more robot data to the device_vectors
     void advance_robot();    // launches the move that adds velocity to positions

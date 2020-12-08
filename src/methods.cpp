@@ -30,13 +30,13 @@ __global__ void move_kernel(double *position_x, double *position_y, double *posi
 {
     unsigned int index = blockDim.x * blockIdx.x + threadIdx.x;
     if (index >= pop_size) return;
-    if(status[index] == 1){
-	    status[index] = 2;
+    if(status[index] == G_STOP){
+	    status[index] = G_READY;
 	    return;
 	  }
 
-	  if(status[index] == 2){
-	    status[index] = 3;
+	  if(status[index] == G_READY){
+	    status[index] = G_RUNNING;
 	  }
 
 	  double tmp = position_x[index] + velocity_x[index];
@@ -71,6 +71,57 @@ __global__ void move_prediction_kernel(double *position_next_x, double *position
 	}
 	position_next_x[index] += velocity_x[index];
 	position_next_y[index] += velocity_y[index];
+}
+
+__device__ __host__
+g_linked_tree::g_linked_tree(int id, int r, int n)
+{
+	this->id = id;
+	root = r;
+	previous = -1;
+	node = n;
+	branch = 1;
+	branch_dist = 0;
+}
+
+__device__ __host__
+void g_form_path(unsigned int linked1, unsigned int linked2, unsigned int finder, 
+	struct g_linked_tree* g_trees, int* g_trees_next, int *status, double* velocity_x, double* velocity_y, unsigned int total_size)
+{
+	unsigned int tmp = linked1;
+	while (g_trees[tmp].node != g_trees[tmp].root) {
+		status[g_trees[tmp].node] = G_PATH;
+		tmp = g_trees[tmp].previous;
+	}
+	tmp = linked2;
+	while (g_trees[tmp].node != g_trees[tmp].root) {
+		status[g_trees[tmp].node] = G_PATH;
+		tmp = g_trees[tmp].previous;
+	}
+	status[finder] = G_PATH;
+	velocity_x[finder] = 0;
+	velocity_y[finder] = 0;
+	g_trees[finder].root = g_trees[linked1].root; 
+	g_trees[finder].previous = linked1;
+	g_trees[finder].node = finder;
+	
+	if (g_trees[finder].previous == -1) {
+		g_trees[finder].branch = 1;
+		g_trees[finder].branch_dist = 0;
+	} else {
+		g_trees_next[g_trees[finder].previous * total_size + g_trees[g_trees[finder].previous].end++] = finder;
+		g_trees[finder].branch_dist = g_trees[g_trees[finder].previous].branch_dist+1;
+		/* This link is a branch if it meets global variable branch_len */
+		// branch_len is 5 fixed at GPU version
+		if (g_trees[finder].branch_dist >= 5) {
+			g_trees[finder].branch = 1;
+			g_trees[finder].branch_dist = 0;
+		} else {
+			g_trees[finder].branch = 0;
+		}
+	}
+	
+	printf("FOUND A PATH\n");
 }
 #endif
 
@@ -155,6 +206,10 @@ objective::objective(unsigned int dimension, double radius, double limit, unsign
 	this->id = id;	
 	/* Establish root of linked tree */
 	this->link = new linked_tree(this, NULL, this);
+
+#ifdef GPU
+	this->g_link = id;
+#endif
 };
 
 /* 
@@ -273,7 +328,7 @@ void individual::move_prediction()
 #ifdef GPU
 /* test collision base on given two indices */
 __device__ __host__
-bool g_if_collision(double* pos_x, double* pos_y, unsigned int first, unsigned int second, double first_radius, double second_radius)
+bool g_if_collision(double* pos_x, double* pos_y, unsigned int first, unsigned int second, double first_radius, double second_radius, double sense_dist)
 {
 	double distance = 0;
 	double x1, x2, y1, y2;
@@ -290,7 +345,7 @@ bool g_if_collision(double* pos_x, double* pos_y, unsigned int first, unsigned i
 
 	distance = sqrt(distance);
 
-	return distance < first_radius + second_radius ? true : false;
+	return distance < first_radius + sense_dist + second_radius ? true : false;
 }
 
 bool population::g_if_collision(unsigned int first, unsigned int second, bool first_use_pos_next, bool second_use_pos_next, double first_radius, double second_radius)
@@ -311,6 +366,199 @@ bool population::g_if_collision(unsigned int first, unsigned int second, bool fi
 	distance = sqrt(distance);
 
 	return distance < first_radius + second_radius ? true : false;
+}
+
+#if 0
+__device__ __host__
+void inner_collision_kernel(unsigned int pop_size, double radius, unsigned int i, char* res, double* pos_x, double* pos_y, char* d_bm)
+{
+	unsigned int j = blockDim.x * blockIdx.x + threadIdx.x;
+    if (j <= i || j >= pop_size) return;
+	
+	*res = g_if_collision(pos_x, pos_y, i, j, radius, radius) ? 1 : *res;
+	
+}
+#endif
+
+__global__
+void collision_kernel(unsigned int pop_size, double radius, char* res, double* pos_x, double* pos_y, char* d_bm)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size) return;
+
+#if 0	
+	dim3 blocksPerGrid(ceil((pop_size)/10.0), 1, 1);
+	dim3 threadsPerBlock(10, 1, 1);
+
+	inner_collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(pop_size, radius, i, res, pos_x, pos_y, d_bm);
+#endif
+	
+	for(unsigned int j = i+1; j < pop_size; ++j){
+		if(g_if_collision(pos_x, pos_y, i, j, radius, radius, 0)){
+			d_bm[i] = 1;
+			d_bm[j] = 1;
+			*res = 1;
+		}
+	}
+	//printf("collision kernel: %f %f\n", pos_x[i], pos_y[i]);
+}
+
+__global__
+void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radius2, char* res, double* pos_x, double* pos_y, char* d_bm)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size) return;
+	
+	for(unsigned int j = 0; j < obj_size; ++j){
+		if(g_if_collision(pos_x, pos_y, i, pop_size + j, radius1, radius2, 0)){
+			d_bm[i] = 1;
+			d_bm[pop_size+j] = 1;
+			*res = 1;
+		}
+	}
+	//printf("collision diff kernel: %d %f %f\n", i, pos_x[i], pos_y[i]);
+}
+
+__global__
+void sense_kernel(unsigned int pop_size, double radius, 
+	double* pos_x, double* pos_y, int *status, double sense_dist)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size || status[i] == G_LINK || status[i] == G_PATH || status[i] == G_ON_OBJ) return;
+	
+	for(unsigned int j = i+1; j < pop_size; ++j){
+		if(g_if_collision(pos_x, pos_y, i, j, radius, radius, sense_dist) && status[j] == G_LINK){
+			status[i] = G_SENSE;
+			//printf("Entity %d sensed entity %d\n", i, j);
+		}
+	}
+	
+}
+
+__global__
+void sense_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radius2, 
+	double* pos_x, double* pos_y, int *status, double sense_dist)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size || status[i] == G_LINK || status[i] == G_PATH) return;
+	
+	for(unsigned int j = 0; j < obj_size; ++j){
+		if(g_if_collision(pos_x, pos_y, i, pop_size + j, radius1, radius2, sense_dist)){
+			status[i] = G_ON_OBJ;
+			//printf("Entity %d sensed objective %d\n", i, j);
+		}
+	}
+	
+}
+
+__global__
+void decide_kernel(unsigned int pop_size, double radius, struct g_linked_tree* g_trees, int* g_trees_next, 
+	double* pos_x, double* pos_y, double* velocity_x, double* velocity_y, int *status, double sense_dist, unsigned int total_size)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size || status[i] != G_SENSE) return;
+	
+	int another = -1;
+	int k_actual = -1;
+	for(unsigned int j = i+1; j < pop_size; ++j){
+		if(g_if_collision(pos_x, pos_y, i, j, radius, radius, sense_dist) && status[j] == G_LINK){
+			if(another != -1 && g_trees[another].root != g_trees[j].root){
+				g_form_path(another, j, i, g_trees, g_trees_next, status, velocity_x, velocity_y, total_size);
+				break;
+			}
+			if(g_trees[j].end < 1 || g_trees[j].branch){
+				another = j;
+				k_actual = j;
+			}
+		}
+	}
+	
+	//printf("Entity %d is trying to link with entity %d\n", i, k_actual);
+	
+	if(status[i] == G_PATH){
+		return;
+	}
+	
+	if(another == -1){
+		status[i] = G_RUNNING;
+		return;
+	}
+	
+	status[i] = G_LINK;
+	velocity_x[i] = 0;
+	velocity_y[i] = 0;
+	g_trees[i].id = i;
+	g_trees[i].root = g_trees[another].root;
+	g_trees[i].previous = another;
+	g_trees[i].node = i;
+	
+	if (g_trees[i].previous == -1) {
+		g_trees[i].branch = 1;
+		g_trees[i].branch_dist = 0;
+	} else {
+		g_trees_next[g_trees[i].previous * total_size + g_trees[g_trees[i].previous].end++] = i;
+		g_trees[i].branch_dist = g_trees[g_trees[i].previous].branch_dist+1;
+		/* This link is a branch if it meets global variable branch_len */
+		// branch_len is 5 fixed at GPU version
+		if (g_trees[i].branch_dist >= 5) {
+			g_trees[i].branch = 1;
+			g_trees[i].branch_dist = 0;
+		} else {
+			g_trees[i].branch = 0;
+		}
+	}
+	
+	printf("Entity %d is linking with entity %d\n", i, k_actual);
+}
+
+__global__
+void decide_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radius2, struct g_linked_tree* g_trees, int* g_trees_next,
+	double* pos_x, double* pos_y, double* velocity_x, double* velocity_y, int *status, double sense_dist, unsigned int total_size)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size || status[i] != G_ON_OBJ) return;
+	
+	int obj = -1;
+	for(unsigned int j = 0; j < obj_size; ++j){
+		if(g_if_collision(pos_x, pos_y, i, pop_size + j, radius1, radius2, sense_dist)){
+			if(obj == -1){
+				obj = j;
+			}
+		}
+	}
+	
+	//printf("Entity %d is trying to link with objective %d\n", i, obj);
+	
+	if(obj == -1){
+		status[i] = G_RUNNING;
+		return;
+	}
+	
+	status[i] = G_LINK;
+	velocity_x[i] = 0;
+	velocity_y[i] = 0;
+	g_trees[i].id = i;
+	g_trees[i].root = g_trees[obj].root;
+	g_trees[i].previous = obj;
+	g_trees[i].node = i;
+	
+	if (g_trees[i].previous == -1) {
+		g_trees[i].branch = 1;
+		g_trees[i].branch_dist = 0;
+	} else {
+		g_trees_next[g_trees[i].previous * total_size + g_trees[g_trees[i].previous].end++] = i;
+		g_trees[i].branch_dist = g_trees[g_trees[i].previous].branch_dist+1;
+		/* This link is a branch if it meets global variable branch_len */
+		// branch_len is 5 fixed at GPU version
+		if (g_trees[i].branch_dist >= 5) {
+			g_trees[i].branch = 1;
+			g_trees[i].branch_dist = 0;
+		} else {
+			g_trees[i].branch = 0;
+		}
+	}
+	
+	printf("Entity %d is linking with objective %d\n", i, obj);
 }
 #endif
 
@@ -396,6 +644,19 @@ void population::sense(double sense_dist)
 /* Is each entity within sensing distance of any of the objectives? */
 void population::sense_objectives(double sense_dist)
 {
+#ifdef GPU
+	double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
+	double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
+	int* d_status = thrust::raw_pointer_cast(&g_status[0]);
+
+	dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+	dim3 threadsPerBlock(10, 1, 1);
+
+	sense_diff_kernel<<<blocksPerGrid,threadsPerBlock>>>(pop_size, num_objs, this->entities[0].radius, this->objectives[0]->radius, 
+		d_position_x, d_position_y, d_status, sense_dist);
+	cudaDeviceSynchronize();
+
+#else
 	for (unsigned int i = 0; i < this->pop_size; ++i){
 		if (this->entities[i].status == LINK || this->entities[i].status == PATH) continue;
 		/* Is an entity on top of an objective? */
@@ -406,12 +667,24 @@ void population::sense_objectives(double sense_dist)
 			}
 		}
 	}
+#endif
 }
 
 /* Is each entity (who has not already sensed an objective, or is not already linked or
 within a path) within sensing distance of at least one other linked entity? */
 void population::sense_entities(double sense_dist)
 {	
+#ifdef GPU
+	double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
+	double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
+	int* d_status = thrust::raw_pointer_cast(&g_status[0]);
+
+	dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+	dim3 threadsPerBlock(10, 1, 1);
+
+	sense_kernel<<<blocksPerGrid,threadsPerBlock>>>(pop_size, this->entities[0].radius, d_position_x, d_position_y, d_status, sense_dist);
+	cudaDeviceSynchronize();
+#else
 	unsigned int left_x, right_x, up_y, down_y;
 	double l = this->dim_limit;
 	double c = this->cell_size;
@@ -452,6 +725,7 @@ void population::sense_entities(double sense_dist)
 			}
 		}
 	}
+#endif
 }
 
 void population::decide(double sense_dist)
@@ -463,6 +737,22 @@ void population::decide(double sense_dist)
 /* An entity will always link with objectives */
 void population::decide_link_objective(double sense_dist)
 {
+#ifdef GPU
+	double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
+	double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
+	double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
+	double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
+	int* d_status = thrust::raw_pointer_cast(&g_status[0]);
+	struct g_linked_tree* d_linked_tree = thrust::raw_pointer_cast(&g_trees[0]);
+	int* g_next = thrust::raw_pointer_cast(&g_trees_next[0]);
+
+	dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+	dim3 threadsPerBlock(10, 1, 1);
+
+	decide_diff_kernel<<<blocksPerGrid,threadsPerBlock>>>(pop_size, num_objs, this->entities[0].radius, this->objectives[0]->radius, 
+		d_linked_tree, g_next, d_position_x, d_position_y, d_velocity_x, d_velocity_y, d_status, sense_dist, total_size);
+	cudaDeviceSynchronize();
+#else
 	for (unsigned int i = 0; i < this->pop_size; ++i){
 		/* If the entity sensed that it was on an objective */
 		if (this->entities[i].status == ON_OBJ) {
@@ -489,12 +779,29 @@ void population::decide_link_objective(double sense_dist)
 			this->entities[i].link = new linked_tree(obj_tmp->link->root, obj_tmp->link, &(this->entities[i]));
 		}
 	}
+#endif
 }
 
 /* Entities will try to link with other linked entities if possible (free link or branch)
  If an entity can link with two linked entities from different linked_trees, a path is detected */
 void population::decide_link_entity(double sense_dist)
 {
+#ifdef GPU
+	double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
+	double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
+	double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
+	double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
+	int* d_status = thrust::raw_pointer_cast(&g_status[0]);
+	struct g_linked_tree* d_linked_tree = thrust::raw_pointer_cast(&g_trees[0]);
+	int* g_next = thrust::raw_pointer_cast(&g_trees_next[0]);
+
+	dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+	dim3 threadsPerBlock(10, 1, 1);
+
+	decide_kernel<<<blocksPerGrid,threadsPerBlock>>>(pop_size, this->entities[0].radius,
+		d_linked_tree, g_next, d_position_x, d_position_y, d_velocity_x, d_velocity_y, d_status, sense_dist, total_size);
+	cudaDeviceSynchronize();
+#else
 	for (unsigned int i = 0; i < this->pop_size; ++i){
 		if (this->entities[i].status == SENSE) {
 			/* Find the first linked entity that is also free or able to branch */
@@ -530,63 +837,12 @@ void population::decide_link_entity(double sense_dist)
 			this->entities[i].velocity = vector<double>(this->dim, 0);
 			this->entities[i].link = new linked_tree(another_tmp->link->root, another_tmp->link, &(this->entities[i]));
 		}
-	}	
+	}
+#endif	
 }
 
 /* test if collision exists otherwise update collision bitmap 
 	comparisons are only made to nearby entities */
-#ifdef GPU
-#if 0
-__device__ __host__
-void inner_collision_kernel(unsigned int pop_size, double radius, unsigned int i, char* res, double* pos_x, double* pos_y, char* d_bm)
-{
-	unsigned int j = blockDim.x * blockIdx.x + threadIdx.x;
-    if (j <= i || j >= pop_size) return;
-	
-	*res = g_if_collision(pos_x, pos_y, i, j, radius, radius) ? 1 : *res;
-	
-}
-#endif
-
-__global__
-void collision_kernel(unsigned int pop_size, double radius, char* res, double* pos_x, double* pos_y, char* d_bm)
-{
-	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= pop_size) return;
-
-#if 0	
-	dim3 blocksPerGrid(ceil((pop_size)/10.0), 1, 1);
-	dim3 threadsPerBlock(10, 1, 1);
-
-	inner_collision_kernel<<<blocksPerGrid,threadsPerBlock>>>(pop_size, radius, i, res, pos_x, pos_y, d_bm);
-#endif
-	
-	for(unsigned int j = i+1; j < pop_size; ++j){
-		if(g_if_collision(pos_x, pos_y, i, j, radius, radius)){
-			d_bm[i] = 1;
-			d_bm[j] = 1;
-			*res = 1;
-		}
-	}
-	//printf("collision kernel: %f %f\n", pos_x[i], pos_y[i]);
-}
-
-__global__
-void collision_diff_kernel(unsigned int pop_size, unsigned int obj_size, double radius1, double radius2, char* res, double* pos_x, double* pos_y, char* d_bm)
-{
-	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= pop_size) return;
-	
-	for(unsigned int j = 0; j < obj_size; ++j){
-		if(g_if_collision(pos_x, pos_y, i, pop_size + j, radius1, radius2)){
-			d_bm[i] = 1;
-			d_bm[pop_size+j] = 1;
-			*res = 1;
-		}
-	}
-	//printf("collision diff kernel: %d %f %f\n", i, pos_x[i], pos_y[i]);
-}
-#endif
 
 bool population::collision()
 {
@@ -619,11 +875,6 @@ bool population::collision()
 	cudaDeviceSynchronize();
 	res = *d_res ? true : res;
 	cudaFree(d_res);
-	
-	/* FIXME: copy device back to host, shouldn't do that for final product */
-	for(unsigned int i = 0; i < this->pop_size + this->num_objs; ++i){
-		this->bm[i].bit = g_bm[i];
-	}
 
 #else
 	// Loop through each entity
@@ -691,6 +942,7 @@ bool population::init_collision()
 	cudaDeviceSynchronize();
 	
 	res = *d_res ? true : res;
+	cudaFree(d_res);
 
 #else
 	// between entities
@@ -722,6 +974,10 @@ bool population::init_collision()
 			if(this->objectives[i]->if_collision(this->objectives[j])){
 				this->bm[this->pop_size+i].bit = 1;
 				this->bm[this->pop_size+j].bit = 1;
+#ifdef GPU
+				g_bm[this->pop_size+i] = 1;
+				g_bm[this->pop_size+j] = 1;
+#endif
 				res = true;
 			}
 		}
@@ -731,6 +987,44 @@ bool population::init_collision()
 	
 }
 
+__global__
+void first_adjustment_kernel(unsigned int pop_size, double* pos_x, double* pos_y,
+	double* pos_next_x, double* pos_next_y, double* velocity_x, double* velocity_y, char* d_bm, double limit)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size || d_bm[i] == 0) return;
+	
+	d_bm[i] = 0;
+	velocity_x[i] = -velocity_x[i];
+	velocity_y[i] = -velocity_y[i];
+	pos_next_x[i] = pos_x[i];
+	pos_next_y[i] = pos_y[i];
+	
+	double tmp = pos_next_x[i] + velocity_x[i];
+	if(tmp > limit || tmp < -limit){
+		velocity_x[i] = -velocity_x[i];
+	}
+	tmp = pos_next_y[i] + velocity_y[i];
+	if(tmp > limit || tmp < -limit){
+	    velocity_y[i] = -velocity_y[i];
+	}
+	pos_next_x[i] += velocity_x[i];
+	pos_next_y[i] += velocity_y[i];
+}
+
+__global__
+void second_adjustment_kernel(unsigned int pop_size, double* pos_x, double* pos_y,
+	double* pos_next_x, double* pos_next_y, int* d_status, char* d_bm)
+{
+	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= pop_size || d_bm[i] == 0) return;
+	
+	d_bm[i] = 0;
+	pos_next_x[i] = pos_x[i];
+	pos_next_y[i] = pos_y[i];
+	d_status[i] = G_STOP;
+}
+
 /* adjuest velocity of each entity with respect to collision detection */
 void population::adjustment()
 {
@@ -738,7 +1032,24 @@ void population::adjustment()
 
 	/* retries 2 times because we only have 2 directions to go at the moment */
 	while(collision() && retries++ < 2){
-		/* TODO: GPU version */
+#ifdef GPU
+		double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
+		double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
+		double* d_position_next_x = thrust::raw_pointer_cast(&position_next_x[0]);
+		double* d_position_next_y = thrust::raw_pointer_cast(&position_next_y[0]);
+		double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
+		double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
+
+		char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
+
+		dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+		dim3 threadsPerBlock(10, 1, 1);
+
+		first_adjustment_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, d_position_x, d_position_y, 
+			d_position_next_x, d_position_next_y, d_velocity_x, d_velocity_y, d_bm, this->limit);
+		cudaDeviceSynchronize();
+
+#else
 		for(unsigned int i = 0; i < this->pop_size; ++i){
 			if(this->bm[i].bit){
 				this->bm[i].bit = 0;
@@ -753,32 +1064,32 @@ void population::adjustment()
 				this->entities[i].move_prediction();
 				
 				/* FIXME: copy host back to device, shouldn't do that for final product */
-#if GPU
-				this->g_bm[i] = 0;
-				this->velocity_x[i] = this->entities[i].velocity[0];
-				this->position_next_x[i] = this->entities[i].pos[0];
-				this->velocity_y[i] = this->entities[i].velocity[1];
-				this->position_next_y[i] = this->entities[i].pos[1];
-#endif
 			}
 		}
+#endif
 	}
 
 	/* collision still exists, stop the entities detected collision */
 	retries = 0;
 	while(collision() && retries < 2){
-		/* TODO: GPU version */
+#ifdef GPU
+		double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
+		double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
+		double* d_position_next_x = thrust::raw_pointer_cast(&position_next_x[0]);
+		double* d_position_next_y = thrust::raw_pointer_cast(&position_next_y[0]);
+		int* d_g_status = thrust::raw_pointer_cast(&g_status[0]);
+
+		char* d_bm =  thrust::raw_pointer_cast(&g_bm[0]);
+
+		dim3 blocksPerGrid(ceil(pop_size/10.0), 1, 1);
+		dim3 threadsPerBlock(10, 1, 1);
+
+		second_adjustment_kernel<<<blocksPerGrid,threadsPerBlock>>>(this->pop_size, d_position_x, d_position_y, 
+			d_position_next_x, d_position_next_y, d_g_status, d_bm);
+		cudaDeviceSynchronize();
+#else
 		for(unsigned int i = 0; i < this->pop_size; ++i){
 			if(this->bm[i].bit){
-				
-				/* FIXME: copy host back to device, shouldn't do that for final product */
-#if GPU
-				this->g_bm[i] = 0;
-				this->position_next_x[i] = this->entities[i].pos[0];
-				this->position_next_y[i] = this->entities[i].pos[1];
-				int tmp = (int)STOP;
-				this->g_status[i] = tmp;
-#endif
 				this->bm[i].bit = 0;
 				this->entities[i].status = STOP;
 				/* reset pos_next */
@@ -787,6 +1098,7 @@ void population::adjustment()
 				}
 			}
 		}
+#endif
 	}
 	
 	if(retries == 2){
@@ -892,17 +1204,21 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 
 
 #ifdef GPU
-	this->position_x = thrust::device_vector<double>(size+num_objectives, 0);
-	this->position_y = thrust::device_vector<double>(size+num_objectives, 0);
+	this->total_size = size + num_objectives;
+	this->position_x = thrust::device_vector<double>(total_size, 0);
+	this->position_y = thrust::device_vector<double>(total_size, 0);
 	this->position_next_x = thrust::device_vector<double>(size, 0);
 	this->position_next_y = thrust::device_vector<double>(size, 0);
 	this->velocity_x = thrust::device_vector<double>(size, 0);
 	this->velocity_y = thrust::device_vector<double>(size, 0);
 
 	this->g_status = thrust::device_vector<double>(size, 2);
-	this->g_bm = thrust::device_vector<char>(size+num_objectives, 0);
+	this->g_bm = thrust::device_vector<char>(total_size, 0);
 	this->limit = limit;
-
+	
+	this->g_trees = thrust::device_vector<struct g_linked_tree>(total_size, g_linked_tree(-1, -1, -1));
+	this->g_trees_next = thrust::device_vector<int>(total_size*total_size, -1);
+	
 #if 0
 	gpu_uni_malloc((void **) &g_pos_x, (size+num_objectives) * sizeof(double));
 	gpu_uni_malloc((void **) &g_pos_y, (size+num_objectives) * sizeof(double));
@@ -927,6 +1243,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 		this->bm.push_back(one_bit());
 #ifdef GPU
 		g_bm[size+i] = 0;
+		g_trees.push_back(g_linked_tree(size+i, size+i, size+i));
 #endif
 	}
 
@@ -1015,35 +1332,10 @@ void population::advance_robot()
    d_position_next_y, d_velocity_x, d_velocity_y, d_g_status, pop_size, this->limit);
   cudaDeviceSynchronize();
 
-  for (unsigned int i = 0; i < this->pop_size; ++i){
-  	double tmp1 = this->entities[i].pos[0];
-	double tmp2 = this->entities[i].pos[1];
-	this->entities[i].pos[0] = position_x[i];
-  	this->entities[i].pos[1] = position_y[i];
-  	this->entities[i].pos_next[0] = position_next_x[i];
-  	this->entities[i].pos_next[1] = position_next_y[i];
-  	this->entities[i].velocity[0] = velocity_x[i];
-  	this->entities[i].velocity[1] = velocity_y[i];
-	int tmp = g_status[i];
-	this->entities[i].status = static_cast<states>(tmp);
-	this->bm[i].bit = g_bm[i];
-  }
-
 }
 
 void population::predict_robot()
 {
-  for (unsigned int i = 0; i < this->pop_size; ++i){
-  	position_x[i] = this->entities[i].pos[0];
-  	position_y[i] = this->entities[i].pos[1];
-  	position_next_x[i] = this->entities[i].pos_next[0];
-  	position_next_y[i] = this->entities[i].pos_next[1];
-  	velocity_x[i] = this->entities[i].velocity[0];
-  	velocity_y[i] = this->entities[i].velocity[1];
-	g_status[i] = (int)this->entities[i].status;
-	g_bm[i] = this->bm[i].bit;
-  }
-  
   double* d_position_next_x = thrust::raw_pointer_cast(&position_next_x[0]);
   double* d_position_next_y = thrust::raw_pointer_cast(&position_next_y[0]);
   double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
@@ -1054,14 +1346,6 @@ void population::predict_robot()
 
   move_prediction_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_next_x, d_position_next_y, d_velocity_x, d_velocity_y, pop_size, this->limit);
   cudaDeviceSynchronize();
-
-  for (unsigned int i = 0; i < this->pop_size; ++i){
-  	this->entities[i].pos_next[0] = position_next_x[i];
-  	this->entities[i].pos_next[1] = position_next_y[i];
-  	this->entities[i].velocity[0] = velocity_x[i];
-  	this->entities[i].velocity[1] = velocity_y[i];
-  }
-
 }
 
 __device__ __host__ void print_pos(double* position_x, double* position_y, int i){
