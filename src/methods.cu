@@ -289,7 +289,7 @@ void population::sense_entities(double sense_dist)
 		for (unsigned int x = left_x; x <= right_x; x++) {
 			for (unsigned int y = down_y; y <= up_y; y++) {
 				// Iterate through all entities in comparison cell
-				for (unsigned int k = 1; k < this->grid[x][y][0]; k++) {
+				for (unsigned int k = 1; k <= this->grid[x][y][0]; k++) {
 					// j = index of comparison entity (index in this->entities)
 					unsigned int j = this->grid[x][y][k];
 					// Check if "sensing self"
