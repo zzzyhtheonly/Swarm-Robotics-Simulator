@@ -121,7 +121,7 @@ void g_form_path(unsigned int linked1, unsigned int linked2, unsigned int finder
 		}
 	}
 	
-	printf("FOUND A PATH\n");
+	//printf("FOUND A PATH\n");
 }
 #endif
 
@@ -508,7 +508,7 @@ void decide_kernel(unsigned int pop_size, double radius, struct g_linked_tree* g
 		}
 	}
 	
-	printf("Entity %d is linking with entity %d\n", i, k_actual);
+	//printf("Entity %d is linking with entity %d\n", i, k_actual);
 }
 
 __global__
@@ -558,7 +558,7 @@ void decide_diff_kernel(unsigned int pop_size, unsigned int obj_size, double rad
 		}
 	}
 	
-	printf("Entity %d is linking with objective %d\n", i, obj);
+	//printf("Entity %d is linking with objective %d\n", i, obj);
 }
 #endif
 
@@ -773,7 +773,7 @@ void population::decide_link_objective(double sense_dist)
 				continue;
 			}
 			/* Otherwise this entity is now in a linked_tree */
-			std::cout << "Entity " << i << " is linking with objective " << obj_tmp->id << std::endl;
+			//std::cout << "Entity " << i << " is linking with objective " << obj_tmp->id << std::endl;
 			this->entities[i].status = LINK;
 			this->entities[i].velocity = vector<double>(this->dim, 0);
 			this->entities[i].link = new linked_tree(obj_tmp->link->root, obj_tmp->link, &(this->entities[i]));
@@ -830,7 +830,7 @@ void population::decide_link_entity(double sense_dist)
 				this->entities[i].status = RUNNING;
 				continue;
 			}
-			std::cout << "Entity " << i << " is linking with entity " << k_actual << std::endl;
+			//std::cout << "Entity " << i << " is linking with entity " << k_actual << std::endl;
 			/* Entity is within sensing distance of a linked entity, so create another link */
 			//another_tmp->link->free = false;
 			this->entities[i].status = LINK;
@@ -1144,7 +1144,7 @@ void population::form_path(individual *linked1, individual *linked2, individual 
 	finder->status = PATH;
 	finder->velocity = vector<double>(this->dim, 0);
 	finder->link = new linked_tree(linked1->link->root, linked1->link, finder);
-	std::cout << "FOUND A PATH" << std::endl;
+	//std::cout << "FOUND A PATH" << std::endl;
 }
 
 void population::init_grid(double radius, double dimension_limit) {
@@ -1159,7 +1159,7 @@ void population::init_grid(double radius, double dimension_limit) {
 			this->grid[i][j] = vector<unsigned int>();
 		}
 	}
-	std::cout << "Grid is " << grid_size << " by " << grid_size << " with cell size " << cell_size << std::endl;
+	//std::cout << "Grid is " << grid_size << " by " << grid_size << " with cell size " << cell_size << std::endl;
 }
 
 void population::clear_grid() {
@@ -1190,6 +1190,40 @@ void gpu_uni_malloc(void **buf, size_t size)
 	}
 }
 #endif
+
+__global__ void draw_kernel(double *position_x, double *position_y, int *status, int pop_size, int num_objs)
+{
+	unsigned int index = blockDim.x * blockIdx.x + threadIdx.x;
+	if (index >= pop_size+num_objs) return;
+	else if (index >= pop_size) {
+		printf("%d\t%f\t%f\t1.\t0.\t0.\n",index, position_x[index], position_y[index]);
+	}
+	else {
+		if (status[index] == G_LINK)
+			printf("%d\t%f\t%f\t0.\t1.\t0.\n",index, position_x[index], position_y[index]);
+		else if (status[index] == G_PATH)
+			printf("%d\t%f\t%f\t.5\t0.\t.5\n",index, position_x[index], position_y[index]);
+		else
+			printf("%d\t%f\t%f\t0.\t0.\t1.\n",index, position_x[index], position_y[index]);
+	}
+
+}
+
+void population::draw() {
+  double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
+  double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
+  double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
+  double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
+  int* d_g_status = thrust::raw_pointer_cast(&g_status[0]);
+
+
+  dim3 blocksPerGrid(ceil((pop_size+num_objs)/10.0), 1, 1);
+  dim3 threadsPerBlock(10, 1, 1);
+
+
+  draw_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_g_status, pop_size, num_objs);
+  cudaDeviceSynchronize();
+}
 
 /*
  * size: fix to 10 at the moment

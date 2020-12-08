@@ -237,6 +237,7 @@ public:
     void advance_robot();    // launches the move that adds velocity to positions
 	void predict_robot();
 	bool g_if_collision(unsigned int, unsigned int, bool, bool, double, double);
+	void draw();
 #endif
 
 	/* population size */

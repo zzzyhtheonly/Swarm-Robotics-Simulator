@@ -30,6 +30,7 @@ unsigned int max_time = 300;
 unsigned int dimension_size = 2;
 
 ofstream log_file("log.txt");
+bool log_intermediate = false;
 
 #ifdef GPU
 __global__
@@ -220,7 +221,7 @@ void render_function()
 
   
 #ifdef GPU
-	cout << "end of gpu version" << endl;
+	//cout << "end of gpu version" << endl;
 	video_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
 	
 #if 0
@@ -231,7 +232,7 @@ void render_function()
 	char* d_bm =  thrust::raw_pointer_cast(&test.g_bm[0]);
 	device_print_something<<<blocksPerGrid,threadsPerBlock>>>(population_size, d_position_x, d_position_y, d_bm);
 #endif
-	cout << video_time << endl;
+	//cout << video_time << endl;
 	//return;
 #endif
   
@@ -339,13 +340,16 @@ void render_function()
 #endif
 		draw_lines_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;	
 
+		if (log_intermediate)
+			test.draw();
+
 		double total_time = ((double)(clock() - start))/ CLOCKS_PER_SEC;
 		if (total_time >= max_time) {
 			double unaccounted = total_time;
 			unaccounted -= init_time + draw_obj_time + draw_entities_time + sense_time;
 			unaccounted -= decide_time + move_prediction_time + adjustment_time;
 			unaccounted -= move_time + draw_lines_time;
-
+			
 			std::cout << "Ran for " << total_time << " seconds." << std::endl;
 			std::cout << "Timing breakdown\n--------------------" << std::endl;
 			printf("\tInitialization: %.2f%%\n", (init_time/total_time)*100.);
@@ -381,7 +385,7 @@ void render_function()
 
 		glFlush();
 		clear_screen();
-		log_file << CLR_STR << std::endl;
+		std::cout << CLR_STR << std::endl;
 	}
 
 	glFlush();
@@ -408,13 +412,16 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	while((opt = getopt(argc, argv, "lrt")) != -1)
+	while((opt = getopt(argc, argv, "lirt")) != -1)
 	{
 		switch(opt)
 		{
 			case 'l':
 				render_log(&argc, argv);
 				exit(0);
+			case 'i':
+				log_intermediate = true;
+				break;
 			case 'r':
 				mode = RANDOM_INIT;
 				break;
@@ -447,7 +454,7 @@ int main(int argc, char* argv[])
 		max_time = atoi(argv[optind++]);
 	}
 
-	log_file << GRD_DIM_STR << "\t" << std::to_string(ground_dimension) << std::endl
+	std::cout << GRD_DIM_STR << "\t" << std::to_string(ground_dimension) << std::endl
 		<< NUM_ENT_STR << "\t" << std::to_string(population_size) << std::endl
 		<< RAD_STR << "\t" << std::to_string(radius) << std::endl
 		<< NUM_OBJ_STR << "\t" << std::to_string(number_objectives) << std::endl
