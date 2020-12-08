@@ -170,10 +170,13 @@ public:
 	vector<one_bit> bm; 
 
 	/* Grid for detecting collisions */
-	const int grid_depth = 4+1;
-	unsigned int ***grid;
+	const unsigned int grid_depth = 4+1;
+	unsigned int *grid;
 	unsigned int cell_size;
 	unsigned int grid_size;
+	unsigned int grid_size_depth;
+	unsigned int grid_size_sq;
+	unsigned int grid_lim;
 	unsigned int *dev_grid;
 
 	/* construct functions */
@@ -207,7 +210,7 @@ public:
 
 	void init_grid(double radius, double dimension_limit);
 	void clear_grid();
-	void assign_to_grid();
+	bool assign_to_grid();
 	
 	/* TODO: for genetic algorithm to calculate fitness */
 	void calc_fitness() {}

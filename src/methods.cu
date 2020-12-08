@@ -270,7 +270,8 @@ void population::sense_entities(double sense_dist)
 	double l = this->dim_limit;
 	double c = this->cell_size;
 	double s = sense_dist + this->entities[0].radius*2;
-
+	unsigned int j;
+	unsigned long offset;
 	/* TODO: make it supports GPU */
 
 	// Loop through each entity
@@ -289,9 +290,10 @@ void population::sense_entities(double sense_dist)
 		for (unsigned int x = left_x; x <= right_x; x++) {
 			for (unsigned int y = down_y; y <= up_y; y++) {
 				// Iterate through all entities in comparison cell
-				for (unsigned int k = 1; k <= this->grid[x][y][0]; k++) {
+				offset = x*grid_size_depth + y*grid_depth;
+				for (unsigned int k = 1; k <= this->grid[offset]; k++) {
 					// j = index of comparison entity (index in this->entities)
-					unsigned int j = this->grid[x][y][k];
+					j = this->grid[offset+k];
 					// Check if "sensing self"
 					if (i == j) continue;
 					//cout << i << " | " << j << endl;
@@ -397,7 +399,8 @@ bool population::collision()
 	double l = this->dim_limit;
 	double c = this->cell_size;
 	double r = this->entities[0].radius*2;
-
+	unsigned int j;
+	unsigned long offset;
 	// Loop through each entity
 	for(unsigned int i = 0; i < this->pop_size; ++i){
 		// Each entity will look at their own cell, as well as adjacent cells (including diagonal)
@@ -409,9 +412,10 @@ bool population::collision()
 		for (unsigned int x = left_x; x <= right_x; x++) {
 			for (unsigned int y = down_y; y <= up_y; y++) {
 				// Iterate through all entities in comparison cell
-				for (unsigned int k = 1; k <= this->grid[x][y][0]; k++) {
+				offset = x*grid_size_depth + y*grid_depth;
+				for (unsigned int k = 1; k <= this->grid[offset]; k++) {
 					// j = index of comparison entity (index in this->entities)
-					unsigned int j = this->grid[x][y][k];
+					j = this->grid[offset+k];
 					// Check if "comparing to self"
 					if (i == j) continue;
 					// If colliding with another, then do collision behavior
@@ -555,14 +559,10 @@ void population::init_grid(double radius, double dimension_limit) {
 	while (cell_size < (radius*2)) { cell_size *= 2; }
 	this->grid_size = ((dimension_limit*2)/cell_size)+1;
 
-	this->grid = new unsigned int **[grid_size];
-	for (unsigned int i = 0; i < grid_size; i++) {
-		this->grid[i] = new unsigned int *[grid_size];
-		for (unsigned int j = 0; j < grid_size; j++) {
-			this->grid[i][j] = new unsigned int [grid_depth];
-			this->grid[i][j][0] = 0;
-		}
-	}
+	this->grid_size_depth = grid_size*grid_depth;
+	this->grid_lim = grid_size*grid_size_depth;
+	this->grid = new unsigned int [grid_lim];
+	clear_grid();
 	
 	std::cout << "Grid is " << grid_size << " by " << grid_size << " with cell size " << cell_size << std::endl;
 	int SIZE = grid_size*grid_size*grid_depth*sizeof(unsigned int);
@@ -570,26 +570,30 @@ void population::init_grid(double radius, double dimension_limit) {
 }
 
 void population::clear_grid() {
+	unsigned int offset;
 	for (unsigned int i = 0; i < grid_size; i++) {
 		for (unsigned int j = 0; j < grid_size; j++) {
-			this->grid[i][j][0] = 0;
+			offset = i*grid_size_depth + j*grid_depth;
+                        grid[offset] = 0;
 		}
 	}
 }
 
-void population::assign_to_grid() {
+bool population::assign_to_grid() {
 	unsigned int grid_x,grid_y;
-	int size;
+	unsigned int offset, size;
 	for (unsigned int i = 0; i < this->pop_size; i++) {
 		// grid_x, grid_y are being passed by reference
 		this->entities[i].grid_coordinates(grid_x, grid_y, this->dim_limit, this->cell_size);
-		size = this->grid[grid_x][grid_y][0];
+		offset = grid_x*grid_size_depth + grid_y*grid_depth;
+		size = this->grid[offset];
 		size++;
 		if (size >= grid_depth)
-			throw "Too many agents in one cell!";
-		this->grid[grid_x][grid_y][size] = this->entities[i].id;
-		this->grid[grid_x][grid_y][0] = size;
+			return false;
+		this->grid[offset+size] = this->entities[i].id;
+		this->grid[offset] = size;
 	}
+	return true;
 }
 
 /*
@@ -617,11 +621,11 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 
         this->init_grid(radius, limit);
         this->clear_grid();
-        this->assign_to_grid();
+        bool no_cell_overflow = this->assign_to_grid();
 
 	unsigned int retries = 0;
 	/* make sure the population is initialized with no collision, give a retry limitation to prevent forever loop */
-	while(init_collision() && retries++ < 99){
+	while(no_cell_overflow && init_collision() && retries++ < 99){
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < size; ++i){
 			if(this->bm[i].bit){
@@ -638,7 +642,7 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 			}
 		}
 		this->clear_grid();
-		this->assign_to_grid();
+		no_cell_overflow = this->assign_to_grid();
 	}
 
 	if(retries == 100){
