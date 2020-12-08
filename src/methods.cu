@@ -289,7 +289,7 @@ void population::sense_entities(double sense_dist)
 		for (unsigned int x = left_x; x <= right_x; x++) {
 			for (unsigned int y = down_y; y <= up_y; y++) {
 				// Iterate through all entities in comparison cell
-				for (unsigned int k = 0; k < this->grid[x][y].size(); k++) {
+				for (unsigned int k = 1; k < this->grid[x][y][0]; k++) {
 					// j = index of comparison entity (index in this->entities)
 					unsigned int j = this->grid[x][y][k];
 					// Check if "sensing self"
@@ -385,6 +385,8 @@ void population::decide_link_entity(double sense_dist)
 	}	
 }
 
+int max_len = 0;
+
 /* test if collision exists otherwise update collision bitmap 
 	comparisons are only made to nearby entities */
 bool population::collision()
@@ -407,7 +409,7 @@ bool population::collision()
 		for (unsigned int x = left_x; x <= right_x; x++) {
 			for (unsigned int y = down_y; y <= up_y; y++) {
 				// Iterate through all entities in comparison cell
-				for (unsigned int k = 0; k < this->grid[x][y].size(); k++) {
+				for (unsigned int k = 1; k <= this->grid[x][y][0]; k++) {
 					// j = index of comparison entity (index in this->entities)
 					unsigned int j = this->grid[x][y][k];
 					// Check if "comparing to self"
@@ -553,30 +555,40 @@ void population::init_grid(double radius, double dimension_limit) {
 	while (cell_size < (radius*2)) { cell_size *= 2; }
 	this->grid_size = ((dimension_limit*2)/cell_size)+1;
 
-	this->grid = new vector<unsigned int> *[grid_size];
+	this->grid = new unsigned int **[grid_size];
 	for (unsigned int i = 0; i < grid_size; i++) {
-		this->grid[i] = new vector<unsigned int> [grid_size];
+		this->grid[i] = new unsigned int *[grid_size];
 		for (unsigned int j = 0; j < grid_size; j++) {
-			this->grid[i][j] = vector<unsigned int>();
+			this->grid[i][j] = new unsigned int [grid_depth];
+			this->grid[i][j][0] = 0;
 		}
 	}
+	
 	std::cout << "Grid is " << grid_size << " by " << grid_size << " with cell size " << cell_size << std::endl;
+	int SIZE = grid_size*grid_size*grid_depth*sizeof(unsigned int);
+	cudaMalloc(&(this->dev_grid), SIZE);
 }
 
 void population::clear_grid() {
 	for (unsigned int i = 0; i < grid_size; i++) {
 		for (unsigned int j = 0; j < grid_size; j++) {
-			this->grid[i][j].clear();
+			this->grid[i][j][0] = 0;
 		}
 	}
 }
 
 void population::assign_to_grid() {
 	unsigned int grid_x,grid_y;
+	int size;
 	for (unsigned int i = 0; i < this->pop_size; i++) {
 		// grid_x, grid_y are being passed by reference
-		this->entities[i].grid_coordinates(grid_x, grid_y, this->dim_limit, this->cell_size);	
-		this->grid[grid_x][grid_y].push_back(this->entities[i].id);
+		this->entities[i].grid_coordinates(grid_x, grid_y, this->dim_limit, this->cell_size);
+		size = this->grid[grid_x][grid_y][0];
+		size++;
+		if (size >= grid_depth)
+			throw "Too many agents in one cell!";
+		this->grid[grid_x][grid_y][size] = this->entities[i].id;
+		this->grid[grid_x][grid_y][0] = size;
 	}
 }
 

@@ -170,9 +170,11 @@ public:
 	vector<one_bit> bm; 
 
 	/* Grid for detecting collisions */
-	vector<unsigned int> **grid;
+	const int grid_depth = 4+1;
+	unsigned int ***grid;
 	unsigned int cell_size;
 	unsigned int grid_size;
+	unsigned int *dev_grid;
 
 	/* construct functions */
 	population() = delete;
