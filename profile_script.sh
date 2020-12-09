@@ -1,30 +1,30 @@
-echo ./simulator 100 20 500 2 20 300 > test_001_100_500.txt
+./simulator 100 20 500 2 20 300 > test_001_100_500.txt
 echo "test 100 500 done" 
-echo ./simulator 100 20 500 2 20 300 > test_002_100_500.txt
+./simulator 100 20 500 2 20 300 > test_002_100_500.txt
 echo "test 100 500 done" 
 ./simulator 100 20 500 2 20 300 > test_003_100_500.txt
 echo "test 100 500 done" 
-echo ./simulator 100 20 2000 2 20 300 > test_004_100_2000.txt
+./simulator 100 20 2000 2 20 300 > test_004_100_2000.txt
 echo "test 100 2000 done" 
-echo ./simulator 100 20 2000 2 20 300 > test_005_100_2000.txt
+./simulator 100 20 2000 2 20 300 > test_005_100_2000.txt
 echo "test 100 2000 done" 
-echo ./simulator 100 20 2000 2 20 300 > test_006_100_2000.txt
+./simulator 100 20 2000 2 20 300 > test_006_100_2000.txt
 echo "test 100 2000 done"
-echo ./simulator 100 20 5000 2 20 300 > test_007_100_5000.txt
+./simulator 100 20 5000 2 20 300 > test_007_100_5000.txt
 echo "test 100 5000 done"
-echo ./simulator 100 20 5000 2 20 300 > test_008_100_5000.txt
+./simulator 100 20 5000 2 20 300 > test_008_100_5000.txt
 echo "test 100 5000 done"
-echo ./simulator 100 20 5000 2 20 300 > test_009_100_5000.txt
+./simulator 100 20 5000 2 20 300 > test_009_100_5000.txt
 echo "test 100 5000 done"
 ./simulator 1000 20 2000 2 20 300 > test_010_1000_2000.txt
 echo "test 1000 2000 done"
-echo ./simulator 1000 20 2000 2 20 300 > test_011_1000_2000.txt
+./simulator 1000 20 2000 2 20 300 > test_011_1000_2000.txt
 echo "test 1000 2000 done"
 ./simulator 1000 20 2000 2 20 300 > test_012_1000_2000.txt
 echo "test 1000 2000 done"
-echo ./simulator 1000 20 5000 2 20 300 > test_013_1000_5000.txt
+./simulator 1000 20 5000 2 20 300 > test_013_1000_5000.txt
 echo "test 1000 5000 done"
-echo ./simulator 1000 20 5000 2 20 300 > test_014_1000_5000.txt
+./simulator 1000 20 5000 2 20 300 > test_014_1000_5000.txt
 echo "test 1000 5000 done"
 ./simulator 1000 20 5000 2 20 300 > test_015_1000_5000.txt
 echo "test 1000 5000 done"

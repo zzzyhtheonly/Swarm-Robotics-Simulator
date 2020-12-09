@@ -323,7 +323,7 @@ void log_simulation()
 			double unaccounted = total_time;
 			unaccounted -= init_time + draw_obj_time + draw_entities_time + sense_time;
 			unaccounted -= decide_time + move_prediction_time + adjustment_time;
-			unaccounted -= move_time + draw_lines_time;
+			unaccounted -= move_time + draw_lines_time + grid_time;
 
 			double last_update_secs = ((double)(last_update - start)) / CLOCKS_PER_SEC;
 
