@@ -330,6 +330,7 @@ void render_function()
 
 int main(int argc, char* argv[])
 {
+	cudaSetDevice(1);
 	/* parse arguments */
 	int opt;
 	if(argc == 1){
