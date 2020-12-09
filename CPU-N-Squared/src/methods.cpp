@@ -314,7 +314,6 @@ void population::decide_link_objective(double sense_dist)
 				continue;
 			}
 			/* Otherwise this entity is now in a linked_tree */
-			//std::cout << "Entity " << i << " is linking with objective " << obj_tmp->id << std::endl;
 			this->entities[i].status = LINK;
 			this->entities[i].velocity = vector<double>(this->dim, 0);
 			this->entities[i].link = new linked_tree(obj_tmp->link->root, obj_tmp->link, &(this->entities[i]));
@@ -329,9 +328,7 @@ void population::decide_link_entity(double sense_dist)
 	for (unsigned int i = 0; i < this->pop_size; ++i){
 		if (this->entities[i].status == SENSE) {
 			/* Find the first linked entity that is also free or able to branch */
-			//std::cout << "Entity " << i << " is deciding what to do after sensing another linked entity" << std::endl;
 			individual *another_tmp = NULL;
-			unsigned int k_actual = -1;
 			for (unsigned int k = 0; k < this->pop_size; ++k) {
 				if (i == k) continue;
 				if (this->entities[i].if_sense(this->entities[k], sense_dist) &&
@@ -342,7 +339,6 @@ void population::decide_link_entity(double sense_dist)
 					}
 					if (this->entities[k].link->next.size() < 1 || this->entities[k].link->branch) {
 						another_tmp = &(this->entities[k]);
-						k_actual = k;
 					}
 				}
 			}

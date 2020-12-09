@@ -129,7 +129,7 @@ void render_log_function() {
                 }
         }
 	glFlush();
-	std::cout << "Enter anything to end simulation:";
+	std::cout << "Press CTL-C to end simulation...";
 	std::cin.get();
         return;
 }
@@ -171,7 +171,6 @@ void log_simulation()
 	double adjustment_time = 0;
 	double move_time = 0;
 	double draw_lines_time = 0;
-	double grid_time = 0;
 	clock_t start = clock();
 	clock_t last_update = start;
 	/* Variables for giving status in terminal */
