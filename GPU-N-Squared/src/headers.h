@@ -152,7 +152,7 @@ public:
 };
 
 /* Used to differentiate objectives from other drawables
-   Can expand this later */
+ *    Can expand this later */
 class objective : public drawable {
 public:
 	/* collision detection between objectives, only could happen after initialization */

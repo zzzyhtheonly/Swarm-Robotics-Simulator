@@ -32,17 +32,6 @@ unsigned int dimension_size = 2;
 ofstream log_file("log.txt");
 bool log_intermediate = false;
 
-#ifdef GPU
-__global__
-void device_print_something(unsigned int pop_size, double* pos_x, double* pos_y, char* bm)
-{
-	unsigned int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= pop_size) return;
-	
-	printf("%f %f\n", pos_x[i], pos_y[i]);
-}
-#endif
-
 ifstream log_in("log2.txt");
 
 void clear_screen()
@@ -171,23 +160,9 @@ void render_function()
 
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
-	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
+	init_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;	
 
-  
-#ifdef GPU
-	//cout << "end of gpu version" << endl;
-	
-#if 0
-	dim3 blocksPerGrid(ceil((population_size)/16.0), 1, 1);
-	dim3 threadsPerBlock(16, 1, 1);
-	double* d_position_x =  thrust::raw_pointer_cast(&test.position_x[0]);
-	double* d_position_y =  thrust::raw_pointer_cast(&test.position_y[0]);
-	char* d_bm =  thrust::raw_pointer_cast(&test.g_bm[0]);
-	device_print_something<<<blocksPerGrid,threadsPerBlock>>>(population_size, d_position_x, d_position_y, d_bm);
-#endif
 	log_file << "Initialization time: " << init_time << std::endl;
-	//return;
-#endif
   
 	double r,g,b;
 	while(timestamp++){
@@ -238,13 +213,9 @@ void render_function()
 		draw_entities_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		check = clock();
-#ifdef GPU
+
 		test.predict_robot();
-#else
-		for(unsigned int i = 0; i < test.pop_size; ++i){
-			test.entities[i].move_prediction();
-		}
-#endif
+
 		move_prediction_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		check = clock();
@@ -253,13 +224,9 @@ void render_function()
 		
 		/* TODO: GPU version */
 		check = clock();
-#ifdef GPU
+
 		test.advance_robot();
-#else
-        for(unsigned int i = 0; i < test.pop_size; ++i){
-                test.entities[i].move();
-		}
-#endif
+
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
 		/* for leftmost mode, check if all entities reach the rightmost */
@@ -398,18 +365,6 @@ int main(int argc, char* argv[])
 		<< NUM_OBJ_STR << "\t" << std::to_string(number_objectives) << std::endl
 		<< OBJ_RAD_STR << "\t" << std::to_string(radius) << std::endl;
 
-#ifdef GPU
 	render_function();
-#else
-	/* init window */
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_SINGLE);
-	glutInitWindowSize(500, 500);
-	glutInitWindowPosition(100, 100);
-	glutCreateWindow("Robots simulator demo");
-	/* display */
-	glutDisplayFunc(render_function);
-	glutMainLoop();
-#endif
 	return 0;
 }
