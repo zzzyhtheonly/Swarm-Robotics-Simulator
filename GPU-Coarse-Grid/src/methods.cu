@@ -474,8 +474,8 @@ bool population::collision()
 	//Kernel
 	double dist_sq = this->entities[0].radius*2;
 	//dist_sq *= dist_sq;
-	dim3 dimBlock(1,1,16);
-	dim3 dimGrid(3,3,ceil(pop_size/16.));
+	dim3 dimBlock(1,1,32);
+	dim3 dimGrid(3,3,ceil(pop_size/32.));
 	//cout << "GOT HERE" << endl;
 	is_within_distance_kernel<<<dimGrid, dimBlock>>>(pop_size, dev_pos_x, dev_pos_y, dev_bm, dev_grid, cell_size, grid_size, grid_depth, grid_size_depth, dist_sq, dim_limit, dev_pos_next_x, dev_pos_next_y);
 	err = cudaPeekAtLastError();
