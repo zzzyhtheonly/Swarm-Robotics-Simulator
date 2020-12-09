@@ -1210,19 +1210,19 @@ __global__ void draw_kernel(double *position_x, double *position_y, int *status,
 }
 
 void population::draw() {
-  double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
-  double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
-  double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
-  double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
-  int* d_g_status = thrust::raw_pointer_cast(&g_status[0]);
+	double* d_position_x = thrust::raw_pointer_cast(&position_x[0]);
+	double* d_position_y = thrust::raw_pointer_cast(&position_y[0]);
+	double* d_velocity_x = thrust::raw_pointer_cast(&velocity_x[0]);
+	double* d_velocity_y = thrust::raw_pointer_cast(&velocity_y[0]);
+	int* d_g_status = thrust::raw_pointer_cast(&g_status[0]);
 
 
-  dim3 blocksPerGrid(ceil((pop_size+num_objs)/10.0), 1, 1);
-  dim3 threadsPerBlock(10, 1, 1);
+	dim3 blocksPerGrid(ceil((pop_size+num_objs)/16.0), 1, 1);
+	dim3 threadsPerBlock(16, 1, 1);
 
 
-  draw_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_g_status, pop_size, num_objs);
-  cudaDeviceSynchronize();
+	draw_kernel<<<blocksPerGrid,threadsPerBlock>>>(d_position_x, d_position_y, d_g_status, pop_size, num_objs);
+	cudaDeviceSynchronize();
 }
 
 /*

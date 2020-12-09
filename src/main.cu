@@ -45,46 +45,6 @@ void device_print_something(unsigned int pop_size, double* pos_x, double* pos_y,
 
 ifstream log_in("log2.txt");
 
-// Source: http://www.david-amador.com/2012/09/how-to-take-screenshot-in-opengl/
-bool save_screenshot(string filename, int w, int h)
-{	
-  //This prevents the images getting padded 
- // when the width multiplied by 3 is not a multiple of 4
-  glPixelStorei(GL_PACK_ALIGNMENT, 1);
- 
-  int nSize = w*h*3;
-  // First let's create our buffer, 3 channels per Pixel
-  char* dataBuffer = (char*)malloc(nSize*sizeof(char));
- 
-  if (!dataBuffer) return false;
- 
-   // Let's fetch them from the backbuffer	
-   // We request the pixels in GL_BGR format, thanks to Berzeger for the tip
-   glReadPixels((GLint)0, (GLint)0,
-		(GLint)w, (GLint)h,
-		 GL_BGR, GL_UNSIGNED_BYTE, dataBuffer);
- 
-   //Now the file creation
-   FILE *filePtr = fopen(filename.c_str(), "wb");
-   if (!filePtr) return false;
- 
- 
-   unsigned char TGAheader[12]={0,0,2,0,0,0,0,0,0,0,0,0};
-   unsigned char header[6] = { w%256,w/256,
-			       h%256,h/256,
-			       24,0};
-   // We write the headers
-   fwrite(TGAheader,	sizeof(unsigned char),	12,	filePtr);
-   fwrite(header,	sizeof(unsigned char),	6,	filePtr);
-   // And finally our image data
-   fwrite(dataBuffer,	sizeof(GLubyte),	nSize,	filePtr);
-   fclose(filePtr);
- 
-   free(dataBuffer);
- 
-  return true;
-}
-
 void clear_screen()
 {
 	glClearColor(0.0, 0.0, 0.0, 0.0);
@@ -207,13 +167,7 @@ void render_function()
 	double adjustment_time = 0;
 	double move_time = 0;
 	double draw_lines_time = 0;
-
-	double grid_time = 0;
-	double video_time = 0;
 	clock_t start = clock();
-	clock_t last_video = clock();
-	unsigned int video_ctr = 0;
-
 
 	check = clock();
 	population test = population(population_size, dimension_size, radius, ground_dimension, number_objectives, objective_radius, mode);
@@ -222,7 +176,6 @@ void render_function()
   
 #ifdef GPU
 	//cout << "end of gpu version" << endl;
-	video_time = ((double)(clock() - check))/ CLOCKS_PER_SEC;
 	
 #if 0
 	dim3 blocksPerGrid(ceil((population_size)/16.0), 1, 1);
@@ -232,7 +185,7 @@ void render_function()
 	char* d_bm =  thrust::raw_pointer_cast(&test.g_bm[0]);
 	device_print_something<<<blocksPerGrid,threadsPerBlock>>>(population_size, d_position_x, d_position_y, d_bm);
 #endif
-	//cout << video_time << endl;
+	log_file << "Initialization time: " << init_time << std::endl;
 	//return;
 #endif
   
@@ -309,13 +262,6 @@ void render_function()
 #endif
 		move_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
 
-		check = clock();
-#ifndef GPU
-		test.clear_grid();
-		test.assign_to_grid();
-#endif
-		grid_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
-
 		/* for leftmost mode, check if all entities reach the rightmost */
 		if(mode == LEFTMOST_INIT && test.terminate()){
 			break;
@@ -350,42 +296,33 @@ void render_function()
 			unaccounted -= decide_time + move_prediction_time + adjustment_time;
 			unaccounted -= move_time + draw_lines_time;
 			
-			std::cout << "Ran for " << total_time << " seconds." << std::endl;
-			std::cout << "Timing breakdown\n--------------------" << std::endl;
-			printf("\tInitialization: %.2f%%\n", (init_time/total_time)*100.);
-			printf("\tDrawing objectives: %.2f%%\n", (draw_obj_time/total_time)*100.);
-			printf("\tDrawing entities: %.2f%%\n", (draw_entities_time/total_time)*100.);
-			printf("\tSensing: %.2f%%\n", (sense_time/total_time)*100.);
-			printf("\tDeciding: %.2f%%\n", (decide_time/total_time)*100.);
-			printf("\tPredicting moves: %.2f%%\n", (move_prediction_time/total_time)*100.);
-			printf("\tAdjustments: %.2f%%\n", (adjustment_time/total_time)*100.);
-			printf("\tMoving: %.2f%%\n", (move_time/total_time)*100.);
-			printf("\tDrawing lines: %.2f%%\n", (draw_lines_time/total_time)*100.);
-			printf("\tMaintaining grid: %.2f%%\n", (grid_time/total_time)*100.);
-			printf("\tRendering video: %.2f%%\n", (video_time/total_time)*100.);
-			printf("\tTime unaccounted for: %.2f%%\n", (unaccounted/total_time)*100.);
-			std::cout << "\nNumber of updates: " << timestamp-1 << std::endl;
+			log_file << "\nSimulation Complete\n--------------------" << std::endl;
+			log_file << "Ran for " << total_time << " seconds." << std::endl;
+			log_file << "Number of updates: " << timestamp-1 << std::endl;
+			log_file << "\nTiming breakdown\n--------------------" << std::endl;
+			log_file << "\tInitialization: " << (init_time/total_time)*100. << "%%" << std::endl;
+			log_file << "\tDrawing objectives: " << (draw_obj_time/total_time)*100. << "%%" << std::endl;
+			log_file << "\tDrawing entities: " << (draw_entities_time/total_time)*100.<<"%%"<<std::endl;
+			log_file << "\tSensing: " << (sense_time/total_time)*100. << "%%" << std::endl;
+			log_file << "\tDeciding: " << (decide_time/total_time)*100. << "%%" << std::endl;
+			log_file << "\tPredicting moves: "<<(move_prediction_time/total_time)*100.<<"%%"<<std::endl;
+			log_file << "\tAdjustments: " << (adjustment_time/total_time)*100. << "%%" <<std::endl;
+			log_file << "\tMoving: " << (move_time/total_time)*100. << "%%" << std::endl;
+			log_file << "\tDrawing lines: " << (draw_lines_time/total_time)*100. << std::endl;
+			log_file << "\tTime unaccounted for: " << (unaccounted/total_time)*100. << std::endl;
+			log_file << "\nNumber of updates: " << timestamp-1 << std::endl;
 
-			save_screenshot("out.tga", 500, 500);
+			test.draw();
 #ifdef GPU
 			log_file.close();
 #endif
 			exit(0);
 		}
-		
-		check = clock();
-		double time_since_last_screen = ((double)(clock() - last_video))/ CLOCKS_PER_SEC;
-		if (time_since_last_screen > 0.025) {
-			save_screenshot("./video/"  + std::to_string(video_ctr) + ".tga", 500, 500);
-			video_ctr++;
-			last_video = clock();
-		}
-		video_time += ((double)(clock() - check))/ CLOCKS_PER_SEC;
-		
 
 		glFlush();
 		clear_screen();
-		std::cout << CLR_STR << std::endl;
+		if (log_intermediate)
+			std::cout << CLR_STR << std::endl;
 	}
 
 	glFlush();
