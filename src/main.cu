@@ -157,6 +157,7 @@ void render_log(int *argcp, char **argv)
 
 void log_simulation()
 {
+	cudaSetDevice(1);
 	unsigned long timestamp = 1;
 	unsigned int done_count = 0;
 
