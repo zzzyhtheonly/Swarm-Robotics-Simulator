@@ -1,6 +1,8 @@
 #include <bits/stdc++.h>
 #include <algorithm>
 #include "headers.h"
+#include <cuda.h>
+#include <cuda_runtime_api.h>
 
 linked_tree::linked_tree(objective *r, linked_tree *p, drawable *n) {
 	root = r;
@@ -236,8 +238,8 @@ bool individual::if_sense(objective *another, double sense_dist) {
 }
 
 void individual::grid_coordinates(unsigned int &x, unsigned int &y, double limit, double cell) {
-	x = (unsigned int)((this->pos[0]+limit)/cell);
-	y = (unsigned int)((this->pos[1]+limit)/cell);	
+	x = (unsigned int)((this->pos_next[0]+limit)/cell);
+	y = (unsigned int)((this->pos_next[1]+limit)/cell);	
 }
 
 void population::sense(double sense_dist)
@@ -387,13 +389,111 @@ void population::decide_link_entity(double sense_dist)
 	}	
 }
 
-int max_len = 0;
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
+__global__
+void is_within_distance_kernel(unsigned int pop_size, double *pos_x, double *pos_y, bool *bm, unsigned int *grid, 
+	unsigned int cell_size, unsigned int grid_size, unsigned int grid_depth, unsigned int grid_size_depth,
+	double distance, double dim_limit, double *pos_next_x, double *pos_next_y)
+{
+	// Calc my ID
+	unsigned int i = blockIdx.z * blockDim.z + threadIdx.z;
+	if (i >= pop_size) return;
+	//printf("%u here, dim limit is %f\n", i, dim_limit);
+	// Calc the x coordinate of the cell I will compare to
+	//printf("%u here, my pos_x is %f\n", i, pos_x[i]);
+	int grid_x = (int)(pos_next_x[i]+dim_limit) / cell_size;
+	grid_x += (blockIdx.x - 1);
+	if (grid_x < 0 || grid_x >= grid_size) return;
+	//printf("%u here, my grid_x is %d\n", i, grid_x);
+	// Calc the y coordinate of the cell I will compare to
+	//printf("%u here, my pos_y is %f\n", i, pos_y[i]);
+	int grid_y = (int)(pos_next_y[i]+dim_limit) / cell_size;
+	grid_y += (blockIdx.y - 1);
+	if (grid_y < 0 || grid_y >= grid_size) return;	
+	//printf("%u here, checking grid[%d][%d]\n", i, grid_x, grid_y);
+	// Calc offset of cell within grid
+	unsigned int offset = grid_x*grid_size_depth + grid_y*grid_depth;
+	// Iterate through cell
+	double tmp;
+	for (unsigned int k = 1; k <= grid[offset]; k++) {
+		if (i == grid[offset+k]) continue;
+		//printf("GOT HERE with %u and %u\n", i, grid[offset+k]);
+		tmp = pos_next_x[i] - pos_next_x[grid[offset+k]];
+		tmp += pos_next_y[i] - pos_next_y[grid[offset+k]];
+		tmp *= tmp;
+		tmp = sqrt(tmp);
+		//printf("%f vs %f\n", tmp, distance_squared);
+		if (tmp <= distance) {
+			bm[i] = 1;
+			bm[grid[offset+k]] = 1;
+			//printf("GOT HERE with %u and %u\n", i, grid[offset+k]);
+		}
+	}
+}
+int tmp_counter = 0;
 
 /* test if collision exists otherwise update collision bitmap 
 	comparisons are only made to nearby entities */
 bool population::collision()
 {
+	//cout << tmp_counter++ << " attempt." << endl;
+	bool res = false;
+	cudaError_t err = cudaMemcpy(dev_grid, grid, grid_lim*sizeof(unsigned int), cudaMemcpyHostToDevice);
+	gpuErrchk(err);
+	bool bm_cpy[pop_size];
+	for (int i = 0; i < pop_size; i++)
+		bm_cpy[i] = bm[i].bit;
+	err = cudaMemcpy(dev_bm, bm_cpy, pop_size*sizeof(bool), cudaMemcpyHostToDevice);
+	gpuErrchk(err);
+	double tmp[pop_size];
+	for (int i = 0; i < pop_size; i++)
+		tmp[i] = this->entities[i].pos[0];
+	err = cudaMemcpy(dev_pos_x, tmp, pop_size*sizeof(double), cudaMemcpyHostToDevice);
+	gpuErrchk(err);
+	for (int i = 0; i < pop_size; i++)
+                tmp[i] = this->entities[i].pos[1];
+        err = cudaMemcpy(dev_pos_y, tmp, pop_size*sizeof(double), cudaMemcpyHostToDevice);
+	gpuErrchk(err);
+	for (int i = 0; i < pop_size; i++)
+                tmp[i] = this->entities[i].pos_next[0];
+        err = cudaMemcpy(dev_pos_next_x, tmp, pop_size*sizeof(double), cudaMemcpyHostToDevice);
+        gpuErrchk(err);
+        for (int i = 0; i < pop_size; i++)
+                tmp[i] = this->entities[i].pos_next[1];
+        err = cudaMemcpy(dev_pos_next_y, tmp, pop_size*sizeof(double), cudaMemcpyHostToDevice);
+        gpuErrchk(err);
+	//Kernel
+	double dist_sq = this->entities[0].radius*2;
+	//dist_sq *= dist_sq;
+	dim3 dimBlock(1,1,16);
+	dim3 dimGrid(3,3,ceil(pop_size/16.));
+	//cout << "GOT HERE" << endl;
+	is_within_distance_kernel<<<dimGrid, dimBlock>>>(pop_size, dev_pos_x, dev_pos_y, dev_bm, dev_grid, cell_size, grid_size, grid_depth, grid_size_depth, dist_sq, dim_limit, dev_pos_next_x, dev_pos_next_y);
+	err = cudaPeekAtLastError();
+	gpuErrchk(err);
+	err = cudaDeviceSynchronize();
+	gpuErrchk(err);
+	//Kernel End
+	err = cudaMemcpy(bm_cpy, dev_bm, pop_size*sizeof(bool), cudaMemcpyDeviceToHost);
+	gpuErrchk(err);
 
+	for (int i = 0; i < pop_size; i++) {
+		bm[i].bit = bm_cpy[i];
+		if (bm[i].bit)
+			res = true;
+	}
+	
+	return res;
+	/*
 	bool res = false;
 	unsigned int left_x, right_x, up_y, down_y;
 	double l = this->dim_limit;
@@ -430,6 +530,7 @@ bool population::collision()
 	}
 
 	return res;
+	*/
 }
 
 /* customized collsion test only used after initialization */
@@ -501,7 +602,7 @@ void population::adjustment()
 		retries++;
 	}
 	/* collision still exists, stop the entities detected collision */
-	while (collision()){
+	if (collision()){
 		/* TODO: GPU version */
 		for(unsigned int i = 0; i < this->pop_size; ++i){
 			if(this->bm[i].bit){
@@ -513,6 +614,7 @@ void population::adjustment()
 				}
 				/* reset pos_next */
 				for(unsigned int j = 0; j < this->entities[i].dimension; ++j){
+					this->entities[i].velocity[j] = -this->entities[i].velocity[j];
 					this->entities[i].pos_next[j] = this->entities[i].pos[j];
 				}
 			}
@@ -606,6 +708,12 @@ population::population(unsigned int size, unsigned int dimension, double radius,
 	this->num_objs = num_objectives;
 	this->dim = dimension;
 	this->dim_limit = limit;
+
+	gpuErrchk(cudaMalloc(&dev_bm, size*sizeof(bool)));
+	gpuErrchk(cudaMalloc(&dev_pos_x, size*sizeof(double)));
+	gpuErrchk(cudaMalloc(&dev_pos_y, size*sizeof(double)));
+	gpuErrchk(cudaMalloc(&dev_pos_next_x, size*sizeof(double)));
+        gpuErrchk(cudaMalloc(&dev_pos_next_y, size*sizeof(double)));
 
 	for(unsigned int i = 0; i < size; ++i){
 		this->entities.push_back(individual(dimension, radius, limit, mode, i));

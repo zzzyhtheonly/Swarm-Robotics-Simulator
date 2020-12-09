@@ -177,7 +177,13 @@ public:
 	unsigned int grid_size_depth;
 	unsigned int grid_size_sq;
 	unsigned int grid_lim;
+	// Device data structures
 	unsigned int *dev_grid;
+	bool *dev_bm;
+	double *dev_pos_x;
+	double *dev_pos_y;
+	double *dev_pos_next_x;
+	double *dev_pos_next_y;
 
 	/* construct functions */
 	population() = delete;
