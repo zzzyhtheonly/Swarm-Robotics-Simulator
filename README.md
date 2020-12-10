@@ -10,4 +10,6 @@ render-<simulator_version>.sh: <br />
 clean_all.sh: <br />
 --------Cleans up all binaries, .o  and .txt files. <br />
 <br />
-Link to our repo: https://github.com/zzzyhtheonly/Swarm-Robotics-Simulator/tree/submit
+Link to our repo: https://github.com/zzzyhtheonly/Swarm-Robotics-Simulator/tree/submit <br />
+<br />
+Link to data collected during our experiments: https://bit.ly/34ga7sH
