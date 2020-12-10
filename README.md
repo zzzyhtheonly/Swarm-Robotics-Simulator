@@ -9,3 +9,5 @@ render-<simulator_version>.sh: <br />
 --------This will not run on NYU CIMS due to OpenGL issue. <br />
 clean_all.sh: <br />
 --------Cleans up all binaries, .o  and .txt files. <br />
+<br />
+Link to our repo: https://github.com/zzzyhtheonly/Swarm-Robotics-Simulator/
