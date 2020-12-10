@@ -1,5 +1,5 @@
 cd GPU-Coarse-Grid/
-if [[ -f log2.txt ]]
+if [ -f log2.txt ]
 then
 	./simulator -l
 else
