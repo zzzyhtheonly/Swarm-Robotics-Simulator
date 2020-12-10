@@ -1,4 +1,4 @@
-In order to run demostration, please run the following scripts: <br />
+In order to run demo, please run the following scripts: <br />
 <br />
 make_all.sh: <br />
 --------Will make all versions of the simulator. <br />
